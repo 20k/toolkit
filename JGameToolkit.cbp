@@ -30,9 +30,35 @@
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
+			<Add option="-std=c++17" />
 			<Add option="-fexceptions" />
+			<Add option="-DIMGUI_IMPL_OPENGL_LOADER_GLEW" />
+			<Add option="-DSUBPIXEL_FONT_RENDERING" />
+			<Add directory="deps" />
+			<Add directory="deps/imgui" />
 		</Compiler>
+		<Linker>
+			<Add option="-lmingw32" />
+			<Add option="-limgui" />
+			<Add option="-lfreetype" />
+			<Add option="-lopengl32" />
+			<Add option="-lws2_32" />
+			<Add option="-lflac" />
+			<Add option="-lopenal32" />
+			<Add option="-logg" />
+			<Add option="-lglfw3" />
+			<Add option="-lglew32" />
+		</Linker>
+		<Unit filename="deps/imgui/examples/imgui_impl_glfw.cpp" />
+		<Unit filename="deps/imgui/examples/imgui_impl_opengl3.cpp" />
+		<Unit filename="deps/imgui/imgui.cpp" />
+		<Unit filename="deps/imgui/imgui.h" />
+		<Unit filename="deps/imgui/imgui_draw.cpp" />
+		<Unit filename="deps/imgui/imgui_widgets.cpp" />
+		<Unit filename="deps/imgui/misc/freetype/imgui_freetype.cpp" />
 		<Unit filename="main.cpp" />
+		<Unit filename="render_window.cpp" />
+		<Unit filename="render_window.hpp" />
 		<Extensions>
 			<lib_finder disable_auto="1" />
 		</Extensions>
