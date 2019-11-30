@@ -1,0 +1,9 @@
+[submodule "deps/vec"]
+	path = deps/vec
+	url = https://github.com/20k/funvectormaths
+[submodule "deps/imgui"]
+	path = deps/imgui
+	url = https://github.com/20k/imgui-fork
+[submodule "deps/tinydir"]
+	path = deps/tinydir
+	url = https://github.com/cxong/tinydir
