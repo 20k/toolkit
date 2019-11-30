@@ -80,3 +80,75 @@ render_window::render_window(vec2i dim, const std::string& window_title, window_
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 }
+
+vec2i render_window::get_window_size()
+{
+    assert(window);
+
+    int display_w = 0;
+    int display_h = 0;
+
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+
+    return {display_w, display_h};
+}
+
+vec2i render_window::get_window_position()
+{
+    assert(window);
+
+    int wxpos = 0;
+    int wypos = 0;
+
+    glfwGetWindowPos(window, &wxpos, &wypos);
+
+    return {wxpos, wypos};
+}
+
+void render_window::poll()
+{
+    assert(window);
+
+    glfwPollEvents();
+
+    if(glfwWindowShouldClose(window))
+        closing = true;
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void render_window::render()
+{
+    assert(window);
+
+    ImGui::Render();
+
+    vec2i dim = get_window_size();
+
+    glfwMakeContextCurrent(window);
+
+    glViewport(0, 0, dim.x(), dim.y());
+
+    glClearColor(0,0,0,1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    //glDrawBuffer(GL_BACK);
+    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        GLFWwindow* backup_current_context = glfwGetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(backup_current_context);
+    }
+
+    glfwSwapBuffers(window);
+}
+
+bool render_window::should_close()
+{
+    return closing;
+}
