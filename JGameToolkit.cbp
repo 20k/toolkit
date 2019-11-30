@@ -59,6 +59,7 @@
 		<Unit filename="main.cpp" />
 		<Unit filename="render_window.cpp" />
 		<Unit filename="render_window.hpp" />
+		<Unit filename="sfml_compatibility.hpp" />
 		<Unit filename="texture.cpp" />
 		<Unit filename="texture.hpp" />
 		<Unit filename="vertex.hpp" />

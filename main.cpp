@@ -1,6 +1,7 @@
 #include <iostream>
 #include "render_window.hpp"
 #include "vertex.hpp"
+#include "sfml_compatibility.hpp"
 
 int main()
 {
