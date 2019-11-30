@@ -1,5 +1,6 @@
 #include <iostream>
 #include "render_window.hpp"
+#include "vertex.hpp"
 
 int main()
 {
@@ -8,6 +9,19 @@ int main()
     while(!window.should_close())
     {
         window.poll();
+
+        vertex vbase;
+        vbase.colour = {1,1,1,1};
+
+        vertex v1 = vbase;
+        vertex v2 = vbase;
+        vertex v3 = vbase;
+
+        v1.position = {10, 10};
+        v2.position = {50, 10};
+        v3.position = {10, 50};
+
+        window.render({v1, v2, v3}, nullptr);
 
         window.display();
     }

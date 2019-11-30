@@ -171,6 +171,8 @@ void render_window::render(const std::vector<vertex>& vertices, texture* tex)
         idl->PushTextureID(ImGui::GetIO().Fonts->TexID);
     }
 
+    vec2i window_pos = get_window_position();
+
     idl->PrimReserve(vertices.size(), vertices.size());
     ImDrawVert* vtx_write = idl->_VtxWritePtr;
     ImDrawIdx* idx_write = idl->_IdxWritePtr;
@@ -178,13 +180,21 @@ void render_window::render(const std::vector<vertex>& vertices, texture* tex)
 
     for(int i=0; i < (int)vertices.size(); i++)
     {
-        vtx_write[i].pos.x = vertices[i].position.x();
-        vtx_write[i].pos.y = vertices[i].position.y();
+        vtx_write[i].pos.x = vertices[i].position.x() + window_pos.x();
+        vtx_write[i].pos.y = vertices[i].position.y() + window_pos.y();
+        if(tex == nullptr)
+        {
+            vtx_write[i].uv = {ImGui::GetDrawListSharedData()->TexUvWhitePixel.x, ImGui::GetDrawListSharedData()->TexUvWhitePixel.y};
+        }
+        else
+        {
+            vtx_write[i].uv.x = vertices[i].uv.x();
+            vtx_write[i].uv.y = vertices[i].uv.y();
+        }
 
-        vtx_write[i].uv.x = vertices[i].uv.x();
-        vtx_write[i].uv.y = vertices[i].uv.y();
+        vec3f srgb_col = lin_to_srgb_approx(vertices[i].colour.xyz()) * 255.f;
 
-        vec3f srgb_col = lin_to_srgb(vertices[i].colour.xyz()) * 255.f;
+        srgb_col = clamp(srgb_col, 0.f, 255.f);
 
         vtx_write[i].col = IM_COL32((int)srgb_col.x(), (int)srgb_col.y(), (int)srgb_col.z(), (int)(vertices[i].colour.w() * 255));
 
