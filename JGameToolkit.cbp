@@ -48,6 +48,13 @@
 			<Add option="-logg" />
 			<Add option="-lglfw3" />
 			<Add option="-lglew32" />
+			<Add option="-llmdb" />
+			<Add option="-lsfml-system" />
+			<Add option="-lcrypto" />
+			<Add option="-lssl" />
+			<Add option="-fno-pie" />
+			<Add option="-lbacktrace" />
+			<Add option="-ldl" />
 		</Linker>
 		<Unit filename="deps/imgui/examples/imgui_impl_glfw.cpp" />
 		<Unit filename="deps/imgui/examples/imgui_impl_opengl3.cpp" />
@@ -56,6 +63,10 @@
 		<Unit filename="deps/imgui/imgui_draw.cpp" />
 		<Unit filename="deps/imgui/imgui_widgets.cpp" />
 		<Unit filename="deps/imgui/misc/freetype/imgui_freetype.cpp" />
+		<Unit filename="deps/ndb/db_storage.cpp" />
+		<Unit filename="deps/networking/beast_compilation_unit.cpp" />
+		<Unit filename="deps/networking/networking.cpp" />
+		<Unit filename="deps/networking/serialisable.cpp" />
 		<Unit filename="main.cpp" />
 		<Unit filename="render_window.cpp" />
 		<Unit filename="render_window.hpp" />

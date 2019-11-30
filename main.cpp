@@ -2,6 +2,7 @@
 #include "render_window.hpp"
 #include "vertex.hpp"
 #include "sfml_compatibility.hpp"
+#include <networking/networking.hpp>
 
 int main()
 {

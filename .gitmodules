@@ -7,3 +7,9 @@
 [submodule "deps/tinydir"]
 	path = deps/tinydir
 	url = https://github.com/cxong/tinydir
+[submodule "deps/networking"]
+	path = deps/networking
+	url = https://github.com/20k/clientservernetworking
+[submodule "deps/ndb"]
+	path = deps/ndb
+	url = https://github.com/20k/ndb
