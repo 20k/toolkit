@@ -13,3 +13,6 @@
 [submodule "deps/ndb"]
 	path = deps/ndb
 	url = https://github.com/20k/ndb
+[submodule "deps/entt"]
+	path = deps/entt
+	url = https://github.com/skypjack/entt
