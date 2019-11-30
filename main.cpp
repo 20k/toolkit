@@ -9,7 +9,7 @@ int main()
     {
         window.poll();
 
-        window.render();
+        window.display();
     }
 
     return 0;

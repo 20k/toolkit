@@ -59,6 +59,9 @@
 		<Unit filename="main.cpp" />
 		<Unit filename="render_window.cpp" />
 		<Unit filename="render_window.hpp" />
+		<Unit filename="texture.cpp" />
+		<Unit filename="texture.hpp" />
+		<Unit filename="vertex.hpp" />
 		<Extensions>
 			<lib_finder disable_auto="1" />
 		</Extensions>

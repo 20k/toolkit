@@ -1,4 +1,6 @@
 #include "render_window.hpp"
+#include "texture.hpp"
+#include "vertex.hpp"
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <imgui/misc/freetype/imgui_freetype.h>
@@ -119,7 +121,7 @@ void render_window::poll()
     ImGui::NewFrame();
 }
 
-void render_window::render()
+void render_window::display()
 {
     assert(window);
 
@@ -151,4 +153,47 @@ void render_window::render()
 bool render_window::should_close()
 {
     return closing;
+}
+
+void render_window::render(const std::vector<vertex>& vertices, texture* tex)
+{
+    ImDrawList* idl = ImGui::GetBackgroundDrawList(ImGui::GetMainViewport());
+
+    if(tex)
+    {
+        assert(tex->get_size().x() > 0);
+        assert(tex->get_size().y() > 0);
+
+        idl->PushTextureID((void*)tex->handle);
+    }
+    else
+    {
+        idl->PushTextureID(ImGui::GetIO().Fonts->TexID);
+    }
+
+    idl->PrimReserve(vertices.size(), vertices.size());
+    ImDrawVert* vtx_write = idl->_VtxWritePtr;
+    ImDrawIdx* idx_write = idl->_IdxWritePtr;
+    unsigned int vtx_current_idx = idl->_VtxCurrentIdx;
+
+    for(int i=0; i < (int)vertices.size(); i++)
+    {
+        vtx_write[i].pos.x = vertices[i].position.x();
+        vtx_write[i].pos.y = vertices[i].position.y();
+
+        vtx_write[i].uv.x = vertices[i].uv.x();
+        vtx_write[i].uv.y = vertices[i].uv.y();
+
+        vec3f srgb_col = lin_to_srgb(vertices[i].colour.xyz()) * 255.f;
+
+        vtx_write[i].col = IM_COL32((int)srgb_col.x(), (int)srgb_col.y(), (int)srgb_col.z(), (int)(vertices[i].colour.w() * 255));
+
+        idx_write[i] = vtx_current_idx + i;
+    }
+
+    idl->_VtxWritePtr += vertices.size();
+    idl->_IdxWritePtr += vertices.size();
+    idl->_VtxCurrentIdx += vertices.size();
+
+    idl->PopTextureID();
 }

@@ -5,6 +5,8 @@
 #include <imgui/imgui.h>
 
 struct GLFWwindow;
+struct texture;
+struct vertex;
 
 namespace window_flags
 {
@@ -25,8 +27,10 @@ struct render_window
     vec2i get_window_position();
 
     void poll();
-    void render();
+    void display();
     bool should_close();
+
+    void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
 
     GLFWwindow* window = nullptr;
     ImFontAtlas atlas = {};
