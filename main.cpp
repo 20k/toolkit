@@ -28,7 +28,5 @@ int main()
         window.display();
     }
 
-    assert(false);
-
     return 0;
 }
