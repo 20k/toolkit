@@ -198,6 +198,7 @@ namespace cl
 
     struct gl_rendertexture : mem_object
     {
+        bool acquired = false;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
         int w = 0;
         int h = 0;
@@ -207,6 +208,9 @@ namespace cl
         gl_rendertexture(context& ctx);
 
         void create(int w, int h);
+
+        void acquire(command_queue& cqueue);
+        void unacquire(command_queue& cqueue);
     };
 
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);

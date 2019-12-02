@@ -435,3 +435,23 @@ void cl::gl_rendertexture::create(int _w, int _h)
 
     native_mem_object.data = cmem;
 }
+
+void cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
+{
+    if(acquired)
+        return;
+
+    acquired = true;
+
+    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, nullptr);
+}
+
+void cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
+{
+    if(!acquired)
+        return;
+
+    acquired = false;
+
+    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, nullptr);
+}
