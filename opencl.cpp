@@ -260,3 +260,34 @@ cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties p
 
     native_context = ctx.native_context;
 }
+
+cl::buffer::buffer(cl::context& ctx)
+{
+    native_context = ctx.native_context;
+}
+
+void cl::buffer::alloc(int64_t bytes)
+{
+    alloc_size = bytes;
+
+    cl_int err;
+    cl_mem found = clCreateBuffer(native_context.data, CL_MEM_READ_WRITE, alloc_size, nullptr, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "Error allocating buffer" << std::endl;
+        throw std::runtime_error("Could not allocate buffer");
+    }
+
+    native_mem_object.data = found;
+}
+
+void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+{
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_TRUE, 0, alloc_size, ptr, 0, nullptr, nullptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not write");
+    }
+}

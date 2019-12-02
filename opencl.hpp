@@ -129,14 +129,27 @@ namespace cl
         base<cl_mem, clRetainMemObject, clReleaseMemObject, mem_object> native_mem_object;
     };
 
-    /*struct buffer
+    struct buffer : mem_object
     {
-        mem_object mem;
+        base<cl_context, clRetainContext, clReleaseContext, context> native_context;
+        int64_t alloc_size = -1;
 
+        buffer(cl::context& ctx);
 
-    };*/
+        void alloc(int64_t bytes);
+        void write(command_queue& write_on, const char* ptr, int64_t bytes);
 
-    /*struct arg_info
+        template<typename T>
+        void write(command_queue& write_on, const std::vector<T>& data)
+        {
+            if(data.size() == 0)
+                return;
+
+            write(write_on, (const char*)&data[0], data.size() * sizeof(T));
+        }
+    };
+
+    struct arg_info
     {
         void* ptr = nullptr;
         int64_t size = 0;
@@ -156,8 +169,20 @@ namespace cl
 
             arg_list.push_back(inf);
         }
-    };*/
+    };
 
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
 }
+
+template<>
+inline
+void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_mem_object.data;
+    inf.size = sizeof(cl_mem);
+
+    arg_list.push_back(inf);
+}
+
 #endif // OPENCL_HPP_INCLUDED
