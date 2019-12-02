@@ -321,13 +321,21 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
 
     for(int i=0; i < (int)pack.arg_list.size(); i++)
     {
+        printf("PreSet\n");
+
+        std::cout << "KNAT " << kern.native_kernel.data << std::endl;
+
+        std::cout << "SIZE " << pack.arg_list[i].size << " PTR " << pack.arg_list[i].ptr << std::endl;
+
         clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i].size, pack.arg_list[i].ptr);
+
+        printf("PostSet\n");
     }
 
-    int dim = 3;
+    int dim = global_ws.size();
 
-    size_t g_ws[dim] = {0};
-    size_t l_ws[dim] = {0};
+    size_t g_ws[3] = {0};
+    size_t l_ws[3] = {0};
 
     for(int i=0; i < dim; i++)
     {
@@ -354,7 +362,7 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
     cl_int err = CL_SUCCESS;
 
     #ifndef GPU_PROFILE
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, global_ws.size(), nullptr, g_ws, l_ws, 0, nullptr, nullptr);
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, nullptr);
     #else
 
     cl_event local;

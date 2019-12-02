@@ -16,6 +16,32 @@ int main()
 
     ctx.register_program(test);
 
+    cl::command_queue cqueue(ctx);
+
+    std::vector<int> test_vector;
+    test_vector.resize(1024);
+
+    cl::buffer test_buffer(ctx);
+    test_buffer.alloc(sizeof(int) * test_vector.size());
+    test_buffer.write(cqueue, test_vector);
+
+    int arg2 = 1024;
+
+    cl::args args;
+    args.push_back(test_buffer);
+    args.push_back(arg2);
+
+    cqueue.exec("test_kernel", args, {1024}, {256});
+
+    std::vector<int> validate = test_buffer.read<int>(cqueue);
+
+    for(int i=0; i < (int)validate.size(); i++)
+    {
+        printf("Val %i\n", validate[i]);
+
+        assert(validate[i] == i);
+    }
+
     while(!window.should_close())
     {
         window.poll();

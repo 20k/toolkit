@@ -9,7 +9,7 @@
 
 namespace cl
 {
-    template<typename T, cl_int(*U)(T), cl_int(*V)(T), typename derived>
+    template<typename T, cl_int(*U)(T), cl_int(*V)(T)>
     struct base
     {
         T data;
@@ -19,7 +19,7 @@ namespace cl
             data = nullptr;
         }
 
-        base(const derived& other)
+        base(const base<T, U, V>& other)
         {
             data = other.data;
 
@@ -29,7 +29,7 @@ namespace cl
             }
         }
 
-        derived& operator=(const derived& other)
+        base<T, U, V>& operator=(const base<T, U, V>& other)
         {
             if(this == &other)
                 return *this;
@@ -49,13 +49,13 @@ namespace cl
             return *this;
         }
 
-        base(derived&& other)
+        base<T, U, V>(base<T, U, V>&& other)
         {
             data = other.data;
             other.data = nullptr;
         }
 
-        derived& operator=(derived&& other)
+        base<T, U, V>& operator=(base<T, U, V>&& other)
         {
             if(data)
             {
@@ -102,14 +102,14 @@ namespace cl
 
     struct event
     {
-        base<cl_event, clRetainEvent, clReleaseEvent, event> native_event;
+        base<cl_event, clRetainEvent, clReleaseEvent> native_event;
     };
 
     struct program;
 
     struct kernel
     {
-        base<cl_kernel, clRetainKernel, clReleaseKernel, kernel> native_kernel;
+        base<cl_kernel, clRetainKernel, clReleaseKernel> native_kernel;
 
         kernel();
         kernel(program& p, const std::string& name);
@@ -126,7 +126,7 @@ namespace cl
         std::shared_ptr<std::map<std::string, kernel>> kernels;
         cl_device_id selected_device;
 
-        base<cl_context, clRetainContext, clReleaseContext, context> native_context;
+        base<cl_context, clRetainContext, clReleaseContext> native_context;
 
         context();
         void register_program(program& p);
@@ -134,7 +134,7 @@ namespace cl
 
     struct program
     {
-        base<cl_program, clRetainProgram, clReleaseProgram, program> native_program;
+        base<cl_program, clRetainProgram, clReleaseProgram> native_program;
 
         program(context& ctx, const std::string& data, bool is_file = true);
         void build(context& ctx, const std::string& options);
@@ -144,12 +144,12 @@ namespace cl
 
     struct mem_object
     {
-        base<cl_mem, clRetainMemObject, clReleaseMemObject, mem_object> native_mem_object;
+        base<cl_mem, clRetainMemObject, clReleaseMemObject> native_mem_object;
     };
 
     struct buffer : mem_object
     {
-        base<cl_context, clRetainContext, clReleaseContext, context> native_context;
+        base<cl_context, clRetainContext, clReleaseContext> native_context;
         int64_t alloc_size = 0;
 
         buffer(cl::context& ctx);
@@ -178,14 +178,16 @@ namespace cl
 
             ret.resize(alloc_size / sizeof(T));
 
-            read(read_on, &ret[0], alloc_size);
+            read(read_on, (char*)&ret[0], alloc_size);
+
+            return ret;
         }
     };
 
     struct command_queue
     {
-        base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue, command_queue> native_command_queue;
-        base<cl_context, clRetainContext, clReleaseContext, context> native_context;
+        base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
+        base<cl_context, clRetainContext, clReleaseContext> native_context;
         std::shared_ptr<std::map<std::string, kernel>> kernels;
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
@@ -199,6 +201,17 @@ namespace cl
 template<>
 inline
 void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_mem_object.data;
+    inf.size = sizeof(cl_mem);
+
+    arg_list.push_back(inf);
+}
+
+template<>
+inline
+void cl::args::push_back<cl::buffer>(cl::buffer& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
