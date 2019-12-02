@@ -3,10 +3,18 @@
 #include "vertex.hpp"
 #include "sfml_compatibility.hpp"
 #include <networking/networking.hpp>
+#include "opencl.hpp"
 
 int main()
 {
     render_window window({1000, 1000}, "Hello", window_flags::VIEWPORTS);
+
+    cl::context ctx;
+
+    cl::program test(ctx, "test_cl.cl");
+    test.build(ctx, "");
+
+    ctx.register_program(test);
 
     while(!window.should_close())
     {
