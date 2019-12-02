@@ -66,6 +66,7 @@
 			<Add option="-fno-pie" />
 			<Add option="-lbacktrace" />
 			<Add option="-ldl" />
+			<Add option="-lopencl" />
 		</Linker>
 		<Unit filename="deps/imgui/examples/imgui_impl_glfw.cpp" />
 		<Unit filename="deps/imgui/examples/imgui_impl_opengl3.cpp" />
@@ -79,6 +80,8 @@
 		<Unit filename="deps/networking/networking.cpp" />
 		<Unit filename="deps/networking/serialisable.cpp" />
 		<Unit filename="main.cpp" />
+		<Unit filename="opencl.cpp" />
+		<Unit filename="opencl.hpp" />
 		<Unit filename="render_window.cpp" />
 		<Unit filename="render_window.hpp" />
 		<Unit filename="sfml_compatibility.hpp" />
@@ -89,6 +92,10 @@
 		<Unit filename="vertex.hpp" />
 		<Extensions>
 			<lib_finder disable_auto="1" />
+			<code_completion />
+			<envvars />
+			<debugger />
+			<fortran_project />
 		</Extensions>
 	</Project>
 </CodeBlocks_project_file>
