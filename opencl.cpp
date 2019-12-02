@@ -128,6 +128,8 @@ cl::kernel::kernel(cl_kernel k)
 
 cl::context::context()
 {
+    kernels = std::make_shared<std::map<std::string, kernel>>();
+
     cl_platform_id pid = {};
     get_platform_ids(&pid);
 
@@ -184,7 +186,7 @@ void cl::context::register_program(cl::program& p)
 
         std::cout << "Registered " << k1.name << std::endl;
 
-        kernels[k1.name] = k1;
+        (*kernels)[k1.name] = k1;
     }
 }
 
@@ -240,27 +242,6 @@ void cl::program::build(context& ctx, const std::string& options)
     }
 }
 
-cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props)
-{
-    cl_int err;
-
-    #ifndef GPU_PROFILE
-    cl_command_queue cqueue = clCreateCommandQueue(ctx.native_context.data, ctx.selected_device, props, &err);
-    #else
-    cl_command_queue cqueue = clCreateCommandQueue(ctx.native_context.data, ctx.selected_device, CL_QUEUE_PROFILING_ENABLE | props, &err);
-    #endif
-
-    if(err != CL_SUCCESS)
-    {
-        std::cout << "Error creating command queue " << err << std::endl;
-        throw std::runtime_error("Could not make command queue");
-    }
-
-    native_command_queue.data = cqueue;
-
-    native_context = ctx.native_context;
-}
-
 cl::buffer::buffer(cl::context& ctx)
 {
     native_context = ctx.native_context;
@@ -284,10 +265,123 @@ void cl::buffer::alloc(int64_t bytes)
 
 void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
 {
-    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_TRUE, 0, alloc_size, ptr, 0, nullptr, nullptr);
+    assert(bytes <= alloc_size);
+
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_TRUE, 0, bytes, ptr, 0, nullptr, nullptr);
 
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not write");
+    }
+}
+
+void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
+{
+    assert(bytes <= alloc_size);
+
+    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_TRUE, 0, bytes, ptr, 0, nullptr, nullptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not read");
+    }
+}
+
+cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : kernels(ctx.kernels)
+{
+    cl_int err;
+
+    #ifndef GPU_PROFILE
+    cl_command_queue cqueue = clCreateCommandQueue(ctx.native_context.data, ctx.selected_device, props, &err);
+    #else
+    cl_command_queue cqueue = clCreateCommandQueue(ctx.native_context.data, ctx.selected_device, CL_QUEUE_PROFILING_ENABLE | props, &err);
+    #endif
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "Error creating command queue " << err << std::endl;
+        throw std::runtime_error("Could not make command queue");
+    }
+
+    native_command_queue.data = cqueue;
+
+    native_context = ctx.native_context;
+}
+
+void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
+{
+    assert(global_ws.size() == local_ws.size());
+
+    auto kernel_it = kernels->find(kname);
+
+    if(kernel_it == kernels->end())
+        throw std::runtime_error("No such kernel " + kname);
+
+    cl::kernel& kern = kernel_it->second;
+
+    for(int i=0; i < (int)pack.arg_list.size(); i++)
+    {
+        clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i].size, pack.arg_list[i].ptr);
+    }
+
+    int dim = 3;
+
+    size_t g_ws[dim] = {0};
+    size_t l_ws[dim] = {0};
+
+    for(int i=0; i < dim; i++)
+    {
+        l_ws[i] = local_ws[i];
+        g_ws[i] = global_ws[i];
+
+        if(l_ws[i] == 0)
+            continue;
+
+        if((g_ws[i] % l_ws[i]) != 0)
+        {
+            int rem = g_ws[i] % l_ws[i];
+
+            g_ws[i] -= rem;
+            g_ws[i] += l_ws[i];
+        }
+
+        if(g_ws[i] == 0)
+        {
+            g_ws[i] += l_ws[i];
+        }
+    }
+
+    cl_int err = CL_SUCCESS;
+
+    #ifndef GPU_PROFILE
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, global_ws.size(), nullptr, g_ws, l_ws, 0, nullptr, nullptr);
+    #else
+
+    cl_event local;
+
+    if(out == nullptr)
+        out = &local;
+
+    err = clEnqueueNDRangeKernel(native_command_queue.data, kname.get(), dim, nullptr, g_ws, l_ws, 0, nullptr, out);
+
+    cl_ulong start;
+    cl_ulong finish;
+
+    block();
+
+    clGetEventProfilingInfo(*out, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+    clGetEventProfilingInfo(*out, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
+
+    cl_ulong diff = finish - start;
+
+    double ddiff = diff / 1000. / 1000.;
+
+    std::cout << "kernel " << kname.name << " ms " << ddiff << std::endl;
+
+    #endif // GPU_PROFILE
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kname << std::endl;
     }
 }

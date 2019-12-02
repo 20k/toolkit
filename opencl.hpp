@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <cl/cl.h>
+#include <memory>
 
 namespace cl
 {
@@ -76,6 +77,29 @@ namespace cl
         }
     };
 
+    struct arg_info
+    {
+        void* ptr = nullptr;
+        int64_t size = 0;
+    };
+
+    struct args
+    {
+        std::vector<arg_info> arg_list;
+
+        template<typename T>
+        inline
+        void push_back(T& val)
+        {
+            arg_info inf;
+            inf.ptr = &val;
+            inf.size = sizeof(T);
+
+            arg_list.push_back(inf);
+        }
+    };
+
+
     struct event
     {
         base<cl_event, clRetainEvent, clReleaseEvent, event> native_event;
@@ -99,7 +123,7 @@ namespace cl
     struct context
     {
         std::vector<program> programs;
-        std::map<std::string, kernel> kernels;
+        std::shared_ptr<std::map<std::string, kernel>> kernels;
         cl_device_id selected_device;
 
         base<cl_context, clRetainContext, clReleaseContext, context> native_context;
@@ -116,13 +140,7 @@ namespace cl
         void build(context& ctx, const std::string& options);
     };
 
-    struct command_queue
-    {
-        base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue, command_queue> native_command_queue;
-        base<cl_context, clRetainContext, clReleaseContext, context> native_context;
-
-        command_queue(context& ctx, cl_command_queue_properties props = 0);
-    };
+    struct command_queue;
 
     struct mem_object
     {
@@ -132,7 +150,7 @@ namespace cl
     struct buffer : mem_object
     {
         base<cl_context, clRetainContext, clReleaseContext, context> native_context;
-        int64_t alloc_size = -1;
+        int64_t alloc_size = 0;
 
         buffer(cl::context& ctx);
 
@@ -147,28 +165,32 @@ namespace cl
 
             write(write_on, (const char*)&data[0], data.size() * sizeof(T));
         }
-    };
 
-    struct arg_info
-    {
-        void* ptr = nullptr;
-        int64_t size = 0;
-    };
-
-    struct args
-    {
-        std::vector<arg_info> arg_list;
+        void read(command_queue& read_on, char* ptr, int64_t bytes);
 
         template<typename T>
-        inline
-        void push_back(T& val)
+        std::vector<T> read(command_queue& read_on)
         {
-            arg_info inf;
-            inf.ptr = &val;
-            inf.size = sizeof(T);
+            std::vector<T> ret;
 
-            arg_list.push_back(inf);
+            if(alloc_size == 0)
+                return ret;
+
+            ret.resize(alloc_size / sizeof(T));
+
+            read(read_on, &ret[0], alloc_size);
         }
+    };
+
+    struct command_queue
+    {
+        base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue, command_queue> native_command_queue;
+        base<cl_context, clRetainContext, clReleaseContext, context> native_context;
+        std::shared_ptr<std::map<std::string, kernel>> kernels;
+
+        command_queue(context& ctx, cl_command_queue_properties props = 0);
+
+        void exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
     };
 
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
