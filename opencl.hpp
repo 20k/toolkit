@@ -6,6 +6,7 @@
 #include <string>
 #include <cl/cl.h>
 #include <memory>
+#include <gl/gl.h>
 
 namespace cl
 {
@@ -195,6 +196,19 @@ namespace cl
         void exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
     };
 
+    struct gl_rendertexture : mem_object
+    {
+        base<cl_context, clRetainContext, clReleaseContext> native_context;
+        int w = 0;
+        int h = 0;
+
+        GLuint texture_id = 0;
+
+        gl_rendertexture(context& ctx);
+
+        void create(int w, int h);
+    };
+
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
 }
 
@@ -212,6 +226,17 @@ void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
 template<>
 inline
 void cl::args::push_back<cl::buffer>(cl::buffer& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_mem_object.data;
+    inf.size = sizeof(cl_mem);
+
+    arg_list.push_back(inf);
+}
+
+template<>
+inline
+void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
