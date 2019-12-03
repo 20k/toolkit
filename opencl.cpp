@@ -322,15 +322,7 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
 
     for(int i=0; i < (int)pack.arg_list.size(); i++)
     {
-        printf("PreSet\n");
-
-        std::cout << "KNAT " << kern.native_kernel.data << std::endl;
-
-        std::cout << "SIZE " << pack.arg_list[i].size << " PTR " << pack.arg_list[i].ptr << std::endl;
-
         clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i].size, pack.arg_list[i].ptr);
-
-        printf("PostSet\n");
     }
 
     int dim = global_ws.size();
