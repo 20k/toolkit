@@ -194,6 +194,7 @@ namespace cl
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 
         void exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
+        void block();
     };
 
     struct gl_rendertexture : mem_object

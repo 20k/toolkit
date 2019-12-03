@@ -136,7 +136,7 @@ void render_window::display()
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
     //glDrawBuffer(GL_BACK);
-    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -206,4 +206,11 @@ void render_window::render(const std::vector<vertex>& vertices, texture* tex)
     idl->_VtxCurrentIdx += vertices.size();
 
     idl->PopTextureID();
+}
+
+void render_window::render_texture(unsigned int handle, vec2f p_min, vec2f p_max)
+{
+    ImDrawList* lst = ImGui::GetBackgroundDrawList();
+
+    lst->AddImage((void*)handle, {p_min.x(), p_min.y()}, {p_max.x(), p_max.y()});
 }

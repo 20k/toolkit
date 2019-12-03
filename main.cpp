@@ -18,6 +18,7 @@ int main()
 
     cl::command_queue cqueue(ctx);
 
+    #ifdef TEST_1
     std::vector<int> test_vector;
     test_vector.resize(1024);
 
@@ -41,6 +42,21 @@ int main()
 
         assert(validate[i] == i);
     }
+    #endif // TEST_1
+
+    cl::gl_rendertexture tex(ctx);
+    tex.create(1024, 1024);
+
+    tex.acquire(cqueue);
+
+    cl::args args;
+    args.push_back(tex);
+
+    cqueue.exec("test_kernel2", args, {1024, 1024}, {16, 16});
+
+    tex.unacquire(cqueue);
+
+    cqueue.block();
 
     while(!window.should_close())
     {
@@ -57,6 +73,12 @@ int main()
         v2.position = {50, 10};
         v3.position = {10, 50};
 
+        vec2i tl = window.get_window_position();
+        vec2i br = tl + window.get_window_size();
+
+        std::cout << "TL " << tl << " BR " << br << std::endl;
+
+        window.render_texture(tex.texture_id, {tl.x(), tl.y()}, {br.x(), br.y()});
         window.render({v1, v2, v3}, nullptr);
 
         window.display();

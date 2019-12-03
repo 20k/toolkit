@@ -395,6 +395,11 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
     }
 }
 
+void cl::command_queue::block()
+{
+    clFinish(native_command_queue.data);
+}
+
 cl::gl_rendertexture::gl_rendertexture(context& ctx)
 {
     native_context.data = ctx.native_context.data;

@@ -31,6 +31,7 @@ struct render_window
     bool should_close();
 
     void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
+    void render_texture(unsigned int handle, vec2f p_min, vec2f p_max);
 
     GLFWwindow* window = nullptr;
     ImFontAtlas atlas = {};
