@@ -7,6 +7,9 @@
 #include <cl/cl.h>
 #include <memory>
 #include <gl/gl.h>
+#include <array>
+#include <vec/vec.hpp>
+#include <assert.h>
 
 namespace cl
 {
@@ -183,6 +186,61 @@ namespace cl
 
             return ret;
         }
+    };
+
+    struct image : mem_object
+    {
+        base<cl_context, clRetainContext, clReleaseContext> native_context;
+
+        int dimensions = 1;
+        std::array<int64_t, 3> sizes = {1, 1, 1};
+
+        image(cl::context& ctx);
+
+        void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, const cl_image_format& format);
+
+        template<int N>
+        void alloc(const vec<N, int>& in_dims, const cl_image_format& format)
+        {
+            assert(in_dims.size() == N);
+
+            static_assert(N > 0 && N <= 3);
+
+            std::array<int64_t, 3> storage;
+
+            for(int i=0; i < N; i++)
+                storage[i] = in_dims[i];
+
+            return alloc_impl(N, storage, format);
+        }
+
+        void alloc(std::initializer_list<int> init, const cl_image_format& format)
+        {
+            assert(init.size() <= 3 && init.size() > 0);
+
+            std::array<int64_t, 3> storage = {1,1,1};
+
+            int idx = 0;
+
+            for(auto& i : init)
+            {
+                storage[idx] = i;
+                idx++;
+            }
+
+            return alloc_impl(init.size(), storage, format);
+        }
+
+        /*void write(command_queue& write_on, const char* ptr, int64_t bytes);
+
+        template<typename T>
+        void write(command_queue& write_on, const std::vector<T>& data)
+        {
+            if(data.size() == 0)
+                return;
+
+            write(write_on, (const char*)&data[0], data.size() * sizeof(T));
+        }*/
     };
 
     struct command_queue
