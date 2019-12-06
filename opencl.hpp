@@ -10,6 +10,7 @@
 #include <array>
 #include <vec/vec.hpp>
 #include <assert.h>
+#include <functional>
 
 namespace cl
 {
@@ -202,14 +203,14 @@ namespace cl
         template<int N>
         void alloc(const vec<N, int>& in_dims, const cl_image_format& format)
         {
-            assert(in_dims.size() == N);
+            //assert(in_dims.size() == N);
 
             static_assert(N > 0 && N <= 3);
 
             std::array<int64_t, 3> storage;
 
             for(int i=0; i < N; i++)
-                storage[i] = in_dims[i];
+                storage[i] = in_dims.v[i];
 
             return alloc_impl(N, storage, format);
         }
@@ -272,6 +273,41 @@ namespace cl
         void unacquire(command_queue& cqueue);
     };
 
+    template<int N, typename T>
+    struct flip
+    {
+        int counter = 0;
+        std::array<T, N> buffers;
+
+        template<typename... V>
+        flip(V&&... args) : buffers{std::forward<V>(args)...}
+        {
+
+        }
+
+        template<typename U, typename... V>
+        void apply(U in, V&&... args)
+        {
+            for(int i=0; i < N; i++)
+            {
+                std::invoke(in, buffers[i], std::forward<V>(args)...);
+            }
+        }
+
+        T& get(int offset = 0)
+        {
+            int circ = (counter + offset) % N;
+
+            return buffers[circ];
+        }
+
+        void next()
+        {
+            counter++;
+            counter %= N;
+        }
+    };
+
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
 }
 
@@ -300,6 +336,17 @@ void cl::args::push_back<cl::buffer>(cl::buffer& val)
 template<>
 inline
 void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_mem_object.data;
+    inf.size = sizeof(cl_mem);
+
+    arg_list.push_back(inf);
+}
+
+template<>
+inline
+void cl::args::push_back<cl::image>(cl::image& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
