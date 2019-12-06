@@ -503,3 +503,15 @@ void cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
 
     clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, nullptr);
 }
+
+void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
+{
+    size_t amount = std::min(b1.alloc_size, b2.alloc_size);
+
+    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, b1.native_mem_object.data, b2.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not copy buffers");
+    }
+}

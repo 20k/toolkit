@@ -308,6 +308,8 @@ namespace cl
         }
     };
 
+    void copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2);
+
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
 }
 
