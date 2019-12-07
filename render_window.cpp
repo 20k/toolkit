@@ -8,6 +8,12 @@
 #include <imgui/examples/imgui_impl_opengl3.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <map>
+
+namespace
+{
+    thread_local std::map<std::string, bool> frost_map;
+}
 
 void glfw_error_callback(int error, const char* description)
 {
@@ -125,6 +131,12 @@ void render_window::display()
 {
     assert(window);
 
+    {
+        ///handle frosting
+
+        frost_map.clear();
+    }
+
     ImGui::Render();
 
     vec2i dim = get_window_size();
@@ -213,4 +225,14 @@ void render_window::render_texture(unsigned int handle, vec2f p_min, vec2f p_max
     ImDrawList* lst = ImGui::GetBackgroundDrawList();
 
     lst->AddImage((void*)handle, {p_min.x(), p_min.y()}, {p_max.x(), p_max.y()});
+}
+
+void gui::frost(const std::string& window_name)
+{
+    frost_map[window_name] = true;
+}
+
+void gui::current::frost()
+{
+    return gui::frost(std::string(ImGui::GetCurrentWindow()->Name));
 }

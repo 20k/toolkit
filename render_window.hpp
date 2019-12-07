@@ -40,4 +40,14 @@ private:
     bool closing = false;
 };
 
+namespace gui
+{
+    void frost(const std::string& window_name);
+
+    namespace current
+    {
+        void frost();
+    }
+}
+
 #endif // RENDER_WINDOW_HPP_INCLUDED
