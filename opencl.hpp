@@ -268,7 +268,8 @@ namespace cl
         gl_rendertexture(context& ctx);
 
         void create(int w, int h);
-        void create_from(GLuint texture_id);
+        void create_from_texture(GLuint texture_id);
+        void create_from_framebuffer(GLuint framebuffer_id);
 
         void acquire(command_queue& cqueue);
         void unacquire(command_queue& cqueue);

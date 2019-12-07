@@ -1,3 +1,4 @@
+#include <GL/glew.h>
 #include "opencl.hpp"
 #include <stdexcept>
 #include <string.h>
@@ -6,7 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <assert.h>
-#include <gl/glext.h>
+#include <windows.h>
 
 #define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
 
@@ -484,7 +485,7 @@ void cl::gl_rendertexture::create(int _w, int _h)
     native_mem_object.data = cmem;
 }
 
-void cl::gl_rendertexture::create_from(GLuint _texture_id)
+void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
 {
     ///Do I need this?
     glBindTexture(GL_TEXTURE_2D, _texture_id);
@@ -500,6 +501,35 @@ void cl::gl_rendertexture::create_from(GLuint _texture_id)
 
     texture_id = _texture_id;
     native_mem_object.data = cmem;
+}
+
+void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
+{
+    /*glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, _framebuffer_id);
+
+    GLint params = 0;
+
+    glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, GL_FRONT_LEFT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &params);
+
+    std::cout << "type? " << params << std::endl;
+
+    assert(params == GL_TEXTURE);
+
+    GLint out = 0;
+
+    glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, GL_FRONT_LEFT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &out);
+
+    texture_id = out;
+    */
+
+    ///can't be done
+    /*if(_framebuffer_id == 0)
+    {
+        cl_int err;
+        cl_mem mem = clCreateFromGLRenderbuffer(native_context.data, CL_MEM_READ_WRITE, 0, &err);
+
+        std::cout << "err? " << err << std::endl;
+    }*/
 }
 
 void cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
