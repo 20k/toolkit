@@ -127,15 +127,41 @@ void render_window::poll()
     ImGui::NewFrame();
 }
 
+std::vector<frostable> render_window::get_frostables()
+{
+    ImGuiContext& g = *GImGui;
+
+    std::vector<frostable> frosts;
+
+    for(int i = 0; i != g.Windows.Size; i++)
+    {
+        ImGuiWindow* window = g.Windows[i];
+        if(window->Active && (window->Flags & (ImGuiWindowFlags_ChildWindow)) == 0)
+        {
+            std::string name = std::string(window->Name);
+
+            auto it = frost_map.find(name);
+
+            if(it == frost_map.end() || it->second == false)
+                continue;
+
+            auto pos = window->Pos;
+            ImVec2 dim = window->Size;
+
+            frostable f;
+            f.pos = {pos.x, pos.y};
+            f.dim = {dim.x, dim.y};
+
+            frosts.push_back(f);
+        }
+    }
+
+    return frosts;
+}
+
 void render_window::display()
 {
     assert(window);
-
-    {
-        ///handle frosting
-
-        frost_map.clear();
-    }
 
     ImGui::Render();
 

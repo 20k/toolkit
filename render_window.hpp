@@ -8,6 +8,11 @@ struct GLFWwindow;
 struct texture;
 struct vertex;
 
+namespace cl
+{
+    struct context;
+}
+
 namespace window_flags
 {
     enum window_flags
@@ -19,6 +24,12 @@ namespace window_flags
     };
 }
 
+struct frostable
+{
+    vec2f pos;
+    vec2i dim;
+};
+
 struct render_window
 {
     render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags = window_flags::NONE);
@@ -27,6 +38,22 @@ struct render_window
     vec2i get_window_position();
 
     void poll();
+
+    /*template<typename T>
+    void for_each_frostable(T& in)
+    {
+        for (int i = 0; i != g.Windows.Size; i++)
+        {
+            ImGuiWindow* window = g.Windows[i];
+            if (window->Active && window->HiddenFrames <= 0 && (window->Flags & (ImGuiWindowFlags_ChildWindow)) == 0)
+            {
+
+            }
+        }
+    }*/
+
+    std::vector<frostable> get_frostables();
+
     void display();
     bool should_close();
 

@@ -484,6 +484,24 @@ void cl::gl_rendertexture::create(int _w, int _h)
     native_mem_object.data = cmem;
 }
 
+void cl::gl_rendertexture::create_from(GLuint _texture_id)
+{
+    ///Do I need this?
+    glBindTexture(GL_TEXTURE_2D, _texture_id);
+
+    cl_int err;
+    cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, _texture_id, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "Failure in create from rendertexture " << err << std::endl;
+        throw std::runtime_error("Failure in create_from rendertexture");
+    }
+
+    texture_id = _texture_id;
+    native_mem_object.data = cmem;
+}
+
 void cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
 {
     if(acquired)
