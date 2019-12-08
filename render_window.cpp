@@ -156,6 +156,8 @@ void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
 }
 
+///just realised a much faster version of this
+///unconditionally blur whole screen, then only clip bits we want
 void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 {
     glFinish();
@@ -164,7 +166,7 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
     tex.acquire(win.cqueue);
 
-    for(int i=0; i < 80; i++)
+    for(int i=0; i < 40; i++)
     for(frostable& f : frosty)
     {
         int ix = f.pos.x();
@@ -172,10 +174,6 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
         int dx = f.dim.x();
         int dy = f.dim.y();
-
-        //win.cl_image.clear(win.cqueue);
-
-        win.cl_image.clear(win.cqueue);
 
         cl::args blur;
 
@@ -198,60 +196,6 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
         blur2.push_back(iy);
 
         win.cqueue.exec("blur_image", blur2, {dx, dy}, {16, 16});
-
-        //cl::copy_image(win.cqueue, win.cl_image, tex, (vec2i){0,0}, (vec2i){dx, dy});
-
-        #if 0
-        int red = 0;
-
-        cl::args blur;
-        blur.push_back(tex);
-        blur.push_back(win.cl_image);
-        blur.push_back(f.dim.x());
-        blur.push_back(f.dim.y());
-        blur.push_back(ix);
-        blur.push_back(iy);
-        blur.push_back(red);
-
-        win.cqueue.exec("blur_image", blur, {f.dim.x()/2, f.dim.y()}, {16, 16});
-
-        red = (red + 1) % 2;
-
-        cl::args blur2;
-        blur2.push_back(win.cl_image);
-        blur2.push_back(tex);
-        blur2.push_back(f.dim.x());
-        blur2.push_back(f.dim.y());
-        blur2.push_back(ix);
-        blur2.push_back(iy);
-        blur2.push_back(red);
-
-        win.cqueue.exec("blur_image", blur2, {f.dim.x()/2, f.dim.y()}, {16, 16});
-        #endif // 0
-
-        //win.cl_image.clear(win.cqueue);
-
-        /*cl::copy_image(win.cqueue, tex, win.cl_image, (vec2i){0,0}, (vec2i){dx, dy});
-
-        cl::args blurx;
-        blurx.push_back(tex);
-        blurx.push_back(win.cl_image);
-        blurx.push_back(dx);
-        blurx.push_back(dy);
-        blurx.push_back(ix);
-        blurx.push_back(iy);
-
-        win.cqueue.exec("gauss_x_image", blurx, {dx, dy}, {16, 16});
-
-        cl::args blury;
-        blury.push_back(win.cl_image);
-        blury.push_back(tex);
-        blury.push_back(dx);
-        blury.push_back(dy);
-        blury.push_back(ix);
-        blury.push_back(iy);
-
-        win.cqueue.exec("gauss_y_image", blury, {dx, dy}, {16, 16});*/
     }
 
     tex.unacquire(win.cqueue);
@@ -285,70 +229,6 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     render_window* win = (render_window*)cmd->UserCallbackData;
 
     //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.fbo);
-
-    #if 0
-    glFinish();
-
-    #if 1
-    std::vector<frostable> frosty = win->get_frostables();
-
-    std::cout << "Frosty Size " << frosty.size() << std::endl;
-
-    win->cl_screen_tex.acquire(win->cqueue);
-
-    for(frostable& f : frosty)
-    {
-        /*cl::args blur;
-        blur.push_back(screen_img_full);
-        blur.push_back(screen_img_full2);
-        blur.push_back(f.dim.x());
-        blur.push_back(f.dim.y());
-        blur.push_back(f.pos.x());
-        blur.push_back(f.pos.y());
-
-        cqueue.exec("gauss_x_image", blur, {screen_reduction_dim.x(), screen_reduction_dim.y()}, {16, 16});
-
-        cl::args blur2;
-        blur2.push_back(screen_img_full2);
-        blur2.push_back(screen_img_full);
-        blur2.push_back(f.dim.x());
-        blur2.push_back(f.dim.y());
-        blur2.push_back(f.pos.x());
-        blur2.push_back(f.pos.y());
-
-        cqueue.exec("gauss_y_image", blur2, {screen_reduction_dim.x(), screen_reduction_dim.y()}, {16, 16});*/
-
-        int red = 0;
-
-        cl::args blur;
-        blur.push_back(win->cl_screen_tex);
-        blur.push_back(win->cl_screen_tex);
-        blur.push_back(f.dim.x());
-        blur.push_back(f.dim.y());
-        blur.push_back(f.pos.x());
-        blur.push_back(f.pos.y());
-        blur.push_back(red);
-
-        win->cqueue.exec("blur_image", blur, {f.dim.x()/2, f.dim.y()}, {16, 16});
-
-        red = 1;
-
-        cl::args blur2;
-        blur2.push_back(win->cl_screen_tex);
-        blur2.push_back(win->cl_screen_tex);
-        blur2.push_back(f.dim.x());
-        blur2.push_back(f.dim.y());
-        blur2.push_back(f.pos.x());
-        blur2.push_back(f.pos.y());
-        blur2.push_back(red);
-
-        win->cqueue.exec("blur_image", blur2, {f.dim.x()/2, f.dim.y()}, {16, 16});
-    }
-
-    win->cl_screen_tex.unacquire(win->cqueue);
-    win->cqueue.block();
-    #endif // 0
-    #endif // 0
 
     blur_buffer(*win, win->cl_screen_tex);
 }
@@ -418,42 +298,6 @@ std::vector<frostable> render_window::get_frostables()
     return frosts;
 }
 
-#if 0
-void handle_frosting(render_window& win)
-{
-    std::vector<frostable> frosty = win.get_frostables();
-
-    win.cl_screen_tex.acquire(win.cqueue);
-
-    auto dim = win.get_window_size();
-
-    std::cout << "Frostables " << frosty.size() << std::endl;
-
-    for(frostable& f : frosty)
-    {
-        cl::args blur;
-        blur.push_back(win.cl_screen_tex);
-        blur.push_back(win.cl_image);
-        blur.push_back(dim.x());
-        blur.push_back(dim.y());
-
-        win.cqueue.exec("gauss_x_image", blur, {dim.x(), dim.y()}, {16, 16});
-
-        cl::args blur2;
-        blur2.push_back(win.cl_image);
-        blur2.push_back(win.cl_screen_tex);
-        blur2.push_back(dim.x());
-        blur2.push_back(dim.y());
-
-        win.cqueue.exec("gauss_y_image", blur2, {dim.x(), dim.y()}, {16, 16});
-        //blur.push_back()
-    }
-
-    win.cl_screen_tex.unacquire(win.cqueue);
-    win.cqueue.block();
-}
-#endif // 0
-
 void render_window::display()
 {
     assert(rctx.window);
@@ -468,10 +312,9 @@ void render_window::display()
 
     glViewport(0, 0, dim.x(), dim.y());
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.background_fbo);
+    /*glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.background_fbo);
     glClearColor(0,0,0,1);
-    glClear(GL_COLOR_BUFFER_BIT);
-
+    glClear(GL_COLOR_BUFFER_BIT);*/
 
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
     glClearColor(0,0,0,1);
