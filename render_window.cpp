@@ -20,6 +20,25 @@ void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+void init_screen_data(render_window& win)
+{
+    int wx = win.get_window_size().x();
+    int wy = win.get_window_size().y();
+
+    glGenFramebuffers(1, &win.fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, win.fbo);
+
+    glGenTextures(1, &win.screen_tex);
+    glBindTexture(GL_TEXTURE_2D, win.screen_tex);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, wx, wy, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, win.screen_tex, 0);
+}
+
 render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags)
 {
     glfwSetErrorCallback(glfw_error_callback);
@@ -87,6 +106,8 @@ render_window::render_window(vec2i dim, const std::string& window_title, window_
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+    init_screen_data(*this);
 }
 
 vec2i render_window::get_window_size()
@@ -121,6 +142,15 @@ void render_window::poll()
 
     if(glfwWindowShouldClose(window))
         closing = true;
+
+    auto next_size = get_window_size();
+
+    if(next_size != last_size)
+    {
+        last_size = next_size;
+
+        init_screen_data(*this);
+    }
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -174,7 +204,7 @@ void render_window::display()
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
     //glDrawBuffer(GL_BACK);
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, fbo);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -184,6 +214,11 @@ void render_window::display()
         ImGui::RenderPlatformWindowsDefault();
         glfwMakeContextCurrent(backup_current_context);
     }
+
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, fbo);
+
+    glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
     glfwSwapBuffers(window);
 }

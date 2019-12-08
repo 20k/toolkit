@@ -32,6 +32,9 @@ struct frostable
 
 struct render_window
 {
+    unsigned int fbo;
+    unsigned int screen_tex;
+
     render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags = window_flags::NONE);
 
     vec2i get_window_size();
@@ -65,6 +68,7 @@ struct render_window
 
 private:
     bool closing = false;
+    vec2i last_size;
 };
 
 namespace gui
