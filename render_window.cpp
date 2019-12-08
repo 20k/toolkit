@@ -164,17 +164,49 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
     tex.acquire(win.cqueue);
 
-    for(int i=0; i < 20; i++)
+    for(int i=0; i < 80; i++)
     for(frostable& f : frosty)
     {
         int ix = f.pos.x();
         int iy = win.get_window_size().y() - f.pos.y() - f.dim.y();
 
+        int dx = f.dim.x();
+        int dy = f.dim.y();
+
+        //win.cl_image.clear(win.cqueue);
+
+        win.cl_image.clear(win.cqueue);
+
+        cl::args blur;
+
+        blur.push_back(tex);
+        blur.push_back(win.cl_image);
+        blur.push_back(dx);
+        blur.push_back(dy);
+        blur.push_back(ix);
+        blur.push_back(iy);
+
+        win.cqueue.exec("blur_image", blur, {dx, dy}, {16, 16});
+
+        cl::args blur2;
+
+        blur2.push_back(win.cl_image);
+        blur2.push_back(tex);
+        blur2.push_back(dx);
+        blur2.push_back(dy);
+        blur2.push_back(ix);
+        blur2.push_back(iy);
+
+        win.cqueue.exec("blur_image", blur2, {dx, dy}, {16, 16});
+
+        //cl::copy_image(win.cqueue, win.cl_image, tex, (vec2i){0,0}, (vec2i){dx, dy});
+
+        #if 0
         int red = 0;
 
         cl::args blur;
         blur.push_back(tex);
-        blur.push_back(tex);
+        blur.push_back(win.cl_image);
         blur.push_back(f.dim.x());
         blur.push_back(f.dim.y());
         blur.push_back(ix);
@@ -186,7 +218,7 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
         red = (red + 1) % 2;
 
         cl::args blur2;
-        blur2.push_back(tex);
+        blur2.push_back(win.cl_image);
         blur2.push_back(tex);
         blur2.push_back(f.dim.x());
         blur2.push_back(f.dim.y());
@@ -195,6 +227,31 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
         blur2.push_back(red);
 
         win.cqueue.exec("blur_image", blur2, {f.dim.x()/2, f.dim.y()}, {16, 16});
+        #endif // 0
+
+        //win.cl_image.clear(win.cqueue);
+
+        /*cl::copy_image(win.cqueue, tex, win.cl_image, (vec2i){0,0}, (vec2i){dx, dy});
+
+        cl::args blurx;
+        blurx.push_back(tex);
+        blurx.push_back(win.cl_image);
+        blurx.push_back(dx);
+        blurx.push_back(dy);
+        blurx.push_back(ix);
+        blurx.push_back(iy);
+
+        win.cqueue.exec("gauss_x_image", blurx, {dx, dy}, {16, 16});
+
+        cl::args blury;
+        blury.push_back(win.cl_image);
+        blury.push_back(tex);
+        blury.push_back(dx);
+        blury.push_back(dy);
+        blury.push_back(ix);
+        blury.push_back(iy);
+
+        win.cqueue.exec("gauss_y_image", blury, {dx, dy}, {16, 16});*/
     }
 
     tex.unacquire(win.cqueue);

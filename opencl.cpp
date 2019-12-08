@@ -335,6 +335,26 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
     native_mem_object.data = ret;
 }
 
+void cl::image::clear(cl::command_queue& cqueue)
+{
+    char everything_zero[sizeof(double) * 4] = {0};
+
+    size_t origin[3] = {0,0,0};
+    size_t regions[3] = {0,0,0};
+
+    for(int i=0; i < 3; i++)
+    {
+        regions[i] = sizes[i];
+    }
+
+    cl_int ret = clEnqueueFillImage(cqueue.native_command_queue.data, native_mem_object.data, (const void*)everything_zero, origin, regions, 0, nullptr, nullptr);
+
+    if(ret != CL_SUCCESS)
+    {
+        printf("Ret from clenqueuefillimage %i\n", ret);
+    }
+}
+
 /*void cl::image::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
 {
     size_t origin =

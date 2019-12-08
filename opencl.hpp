@@ -210,7 +210,7 @@ namespace cl
 
             static_assert(N > 0 && N <= 3);
 
-            std::array<int64_t, 3> storage;
+            std::array<int64_t, 3> storage = {1,1,1};
 
             for(int i=0; i < N; i++)
                 storage[i] = in_dims.v[i];
@@ -234,6 +234,8 @@ namespace cl
 
             return alloc_impl(init.size(), storage, format);
         }
+
+        void clear(cl::command_queue& cqueue);
 
         /*void write(command_queue& write_on, const char* ptr, int64_t bytes);
 
@@ -314,6 +316,24 @@ namespace cl
     };
 
     void copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2);
+
+    template<typename T, typename U>
+    void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec3i origin, vec3i region)
+    {
+        size_t src[3] = {(int)origin.x(), (int)origin.y(), (int)origin.z()};
+        size_t iregion[3] = {(int)region.x(), (int)region.y(), (int)region.z()};
+
+        clEnqueueCopyImage(cqueue.native_command_queue.data, i1.native_mem_object.data, i2.native_mem_object.data, src, src, iregion, 0, nullptr, nullptr);
+    }
+
+    template<typename T, typename U>
+    void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec2i origin, vec2i region)
+    {
+        size_t src[3] = {(int)origin.x(), (int)origin.y(), 0};
+        size_t iregion[3] = {(int)region.x(), (int)region.y(), 1};
+
+        clEnqueueCopyImage(cqueue.native_command_queue.data, i1.native_mem_object.data, i2.native_mem_object.data, src, src, iregion, 0, nullptr, nullptr);
+    }
 
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
 }
