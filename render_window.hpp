@@ -47,6 +47,7 @@ struct render_window
     render_context rctx;
     cl::context ctx;
     cl::gl_rendertexture cl_screen_tex;
+    cl::gl_rendertexture cl_background_screen_tex;
     cl::command_queue cqueue;
     cl::image cl_image;
 

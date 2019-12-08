@@ -46,6 +46,7 @@ void init_screen_data(render_window& win, vec2i dim)
     make_fbo(&win.rctx.background_fbo, &win.rctx.background_screen_tex, dim);
 
     win.cl_screen_tex.create_from_texture(win.rctx.screen_tex);
+    win.cl_background_screen_tex.create_from_texture(win.rctx.background_screen_tex);
     win.cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
 }
 
@@ -119,7 +120,7 @@ render_context::render_context(vec2i dim, const std::string& window_title, windo
 
 }
 
-render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx), cl_background_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
 {
     init_screen_data(*this, dim);
 }
@@ -150,17 +151,79 @@ vec2i render_window::get_window_position()
 
 void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
-    /*render_window* win = (render_window*)cmd->UserCallbackData;
+    render_window* win = (render_window*)cmd->UserCallbackData;
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);*/
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
+}
+
+void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
+{
+    std::vector<frostable> frosty = win.get_frostables();
+
+    std::cout << "Frosty Size " << frosty.size() << std::endl;
+
+    tex.acquire(win.cqueue);
+
+    for(frostable& f : frosty)
+    {
+        int red = 0;
+
+        cl::args blur;
+        blur.push_back(tex);
+        blur.push_back(tex);
+        blur.push_back(f.dim.x());
+        blur.push_back(f.dim.y());
+        blur.push_back(f.pos.x());
+        blur.push_back(f.pos.y());
+        blur.push_back(red);
+
+        win.cqueue.exec("blur_image", blur, {f.dim.x()/2, f.dim.y()}, {16, 16});
+
+        red = 1;
+
+        cl::args blur2;
+        blur2.push_back(tex);
+        blur2.push_back(tex);
+        blur2.push_back(f.dim.x());
+        blur2.push_back(f.dim.y());
+        blur2.push_back(f.pos.x());
+        blur2.push_back(f.pos.y());
+        blur2.push_back(red);
+
+        win.cqueue.exec("blur_image", blur2, {f.dim.x()/2, f.dim.y()}, {16, 16});
+    }
+
+    tex.unacquire(win.cqueue);
+    win.cqueue.block();
+}
+
+void blend_buffers(render_window& win, cl::gl_rendertexture& out, cl::gl_rendertexture& in)
+{
+    out.acquire(win.cqueue);
+    in.acquire(win.cqueue);
+
+    cl::args blendo;
+    blendo.push_back(out);
+    blendo.push_back(in);
+    blendo.push_back(out);
+
+    auto dim = win.get_window_size();
+
+    win.cqueue.exec("blend", blendo, {dim.x(), dim.y()}, {16, 16});
+
+    in.unacquire(win.cqueue);
+    out.unacquire(win.cqueue);
+
+    win.cqueue.block();
 }
 
 void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
     render_window* win = (render_window*)cmd->UserCallbackData;
 
-    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.fbo);
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.fbo);
 
+    #if 0
     std::vector<frostable> frosty = win->get_frostables();
 
     std::cout << "Frosty Size " << frosty.size() << std::endl;
@@ -218,6 +281,7 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 
     win->cl_screen_tex.unacquire(win->cqueue);
     win->cqueue.block();
+    #endif // 0
 }
 
 void render_window::poll()
@@ -335,13 +399,14 @@ void render_window::display()
 
     glViewport(0, 0, dim.x(), dim.y());
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.background_fbo);
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    /*glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.background_fbo);
+
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
     glClearColor(0,0,0,1);
-    glClear(GL_COLOR_BUFFER_BIT);*/
+    glClear(GL_COLOR_BUFFER_BIT);
 
     //glDrawBuffer(GL_BACK);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -364,6 +429,9 @@ void render_window::display()
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.background_fbo);
 
     glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);*/
+
+    blur_buffer(*this, cl_background_screen_tex);
+    blend_buffers(*this, cl_screen_tex, cl_background_screen_tex);
 
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
