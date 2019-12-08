@@ -32,6 +32,10 @@ struct render_context
 {
     unsigned int fbo;
     unsigned int screen_tex;
+
+    unsigned int background_fbo;
+    unsigned int background_screen_tex;
+
     GLFWwindow* window = nullptr;
     ImFontAtlas atlas = {};
 
@@ -43,6 +47,8 @@ struct render_window
     render_context rctx;
     cl::context ctx;
     cl::gl_rendertexture cl_screen_tex;
+    cl::command_queue cqueue;
+    cl::image cl_image;
 
     render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags = window_flags::NONE);
 
@@ -50,19 +56,6 @@ struct render_window
     vec2i get_window_position();
 
     void poll();
-
-    /*template<typename T>
-    void for_each_frostable(T& in)
-    {
-        for (int i = 0; i != g.Windows.Size; i++)
-        {
-            ImGuiWindow* window = g.Windows[i];
-            if (window->Active && window->HiddenFrames <= 0 && (window->Flags & (ImGuiWindowFlags_ChildWindow)) == 0)
-            {
-
-            }
-        }
-    }*/
 
     std::vector<frostable> get_frostables();
 

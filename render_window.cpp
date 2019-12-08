@@ -9,6 +9,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <map>
+#include <iostream>
 
 namespace
 {
@@ -20,25 +21,32 @@ void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-void init_screen_data(render_window& win, vec2i dim)
+void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
 {
     int wx = dim.x();
     int wy = dim.y();
 
-    glGenFramebuffers(1, &win.rctx.fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, win.rctx.fbo);
+    glGenFramebuffers(1, fboptr);
+    glBindFramebuffer(GL_FRAMEBUFFER, *fboptr);
 
-    glGenTextures(1, &win.rctx.screen_tex);
-    glBindTexture(GL_TEXTURE_2D, win.rctx.screen_tex);
+    glGenTextures(1, tex);
+    glBindTexture(GL_TEXTURE_2D, *tex);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, win.rctx.screen_tex, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
+}
+
+void init_screen_data(render_window& win, vec2i dim)
+{
+    make_fbo(&win.rctx.fbo, &win.rctx.screen_tex, dim);
+    make_fbo(&win.rctx.background_fbo, &win.rctx.background_screen_tex, dim);
 
     win.cl_screen_tex.create_from_texture(win.rctx.screen_tex);
+    win.cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
 }
 
 render_context::render_context(vec2i dim, const std::string& window_title, window_flags::window_flags flags)
@@ -111,7 +119,7 @@ render_context::render_context(vec2i dim, const std::string& window_title, windo
 
 }
 
-render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx)
+render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
 {
     init_screen_data(*this, dim);
 }
@@ -140,6 +148,78 @@ vec2i render_window::get_window_position()
     return {wxpos, wypos};
 }
 
+void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
+{
+    /*render_window* win = (render_window*)cmd->UserCallbackData;
+
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);*/
+}
+
+void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
+{
+    render_window* win = (render_window*)cmd->UserCallbackData;
+
+    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.fbo);
+
+    std::vector<frostable> frosty = win->get_frostables();
+
+    std::cout << "Frosty Size " << frosty.size() << std::endl;
+
+    win->cl_screen_tex.acquire(win->cqueue);
+
+    for(frostable& f : frosty)
+    {
+        /*cl::args blur;
+        blur.push_back(screen_img_full);
+        blur.push_back(screen_img_full2);
+        blur.push_back(f.dim.x());
+        blur.push_back(f.dim.y());
+        blur.push_back(f.pos.x());
+        blur.push_back(f.pos.y());
+
+        cqueue.exec("gauss_x_image", blur, {screen_reduction_dim.x(), screen_reduction_dim.y()}, {16, 16});
+
+        cl::args blur2;
+        blur2.push_back(screen_img_full2);
+        blur2.push_back(screen_img_full);
+        blur2.push_back(f.dim.x());
+        blur2.push_back(f.dim.y());
+        blur2.push_back(f.pos.x());
+        blur2.push_back(f.pos.y());
+
+        cqueue.exec("gauss_y_image", blur2, {screen_reduction_dim.x(), screen_reduction_dim.y()}, {16, 16});*/
+
+        int red = 0;
+
+        cl::args blur;
+        blur.push_back(win->cl_screen_tex);
+        blur.push_back(win->cl_screen_tex);
+        blur.push_back(f.dim.x());
+        blur.push_back(f.dim.y());
+        blur.push_back(f.pos.x());
+        blur.push_back(f.pos.y());
+        blur.push_back(red);
+
+        win->cqueue.exec("blur_image", blur, {f.dim.x()/2, f.dim.y()}, {16, 16});
+
+        red = 1;
+
+        cl::args blur2;
+        blur2.push_back(win->cl_screen_tex);
+        blur2.push_back(win->cl_screen_tex);
+        blur2.push_back(f.dim.x());
+        blur2.push_back(f.dim.y());
+        blur2.push_back(f.pos.x());
+        blur2.push_back(f.pos.y());
+        blur2.push_back(red);
+
+        win->cqueue.exec("blur_image", blur2, {f.dim.x()/2, f.dim.y()}, {16, 16});
+    }
+
+    win->cl_screen_tex.unacquire(win->cqueue);
+    win->cqueue.block();
+}
+
 void render_window::poll()
 {
     assert(rctx.window);
@@ -161,6 +241,10 @@ void render_window::poll()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+    ImDrawList* draw = ImGui::GetBackgroundDrawList();
+
+    draw->AddCallback(pre_render, this);
 }
 
 std::vector<frostable> render_window::get_frostables()
@@ -184,6 +268,12 @@ std::vector<frostable> render_window::get_frostables()
             auto pos = window->Pos;
             ImVec2 dim = window->Size;
 
+            if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            {
+                pos.x -= ImGui::GetMainViewport()->Pos.x;
+                pos.y -= ImGui::GetMainViewport()->Pos.y;
+            }
+
             frostable f;
             f.pos = {pos.x, pos.y};
             f.dim = {dim.x, dim.y};
@@ -195,9 +285,47 @@ std::vector<frostable> render_window::get_frostables()
     return frosts;
 }
 
+#if 0
+void handle_frosting(render_window& win)
+{
+    std::vector<frostable> frosty = win.get_frostables();
+
+    win.cl_screen_tex.acquire(win.cqueue);
+
+    auto dim = win.get_window_size();
+
+    std::cout << "Frostables " << frosty.size() << std::endl;
+
+    for(frostable& f : frosty)
+    {
+        cl::args blur;
+        blur.push_back(win.cl_screen_tex);
+        blur.push_back(win.cl_image);
+        blur.push_back(dim.x());
+        blur.push_back(dim.y());
+
+        win.cqueue.exec("gauss_x_image", blur, {dim.x(), dim.y()}, {16, 16});
+
+        cl::args blur2;
+        blur2.push_back(win.cl_image);
+        blur2.push_back(win.cl_screen_tex);
+        blur2.push_back(dim.x());
+        blur2.push_back(dim.y());
+
+        win.cqueue.exec("gauss_y_image", blur2, {dim.x(), dim.y()}, {16, 16});
+        //blur.push_back()
+    }
+
+    win.cl_screen_tex.unacquire(win.cqueue);
+    win.cqueue.block();
+}
+#endif // 0
+
 void render_window::display()
 {
     assert(rctx.window);
+
+    ImGui::GetBackgroundDrawList()->AddCallback(post_render, this);
 
     ImGui::Render();
 
@@ -207,10 +335,15 @@ void render_window::display()
 
     glViewport(0, 0, dim.x(), dim.y());
 
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    /*glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.background_fbo);
+    glClearColor(0,0,0,1);
+    glClear(GL_COLOR_BUFFER_BIT);*/
+
     //glDrawBuffer(GL_BACK);
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -220,6 +353,17 @@ void render_window::display()
         ImGui::RenderPlatformWindowsDefault();
         glfwMakeContextCurrent(backup_current_context);
     }
+
+    //handle_frosting(*this);
+
+    /*glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.background_fbo);
+
+    glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);*/
 
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
