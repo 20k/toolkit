@@ -153,7 +153,7 @@ void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
     render_window* win = (render_window*)cmd->UserCallbackData;
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
+    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
 }
 
 void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
@@ -164,12 +164,13 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
     tex.acquire(win.cqueue);
 
+    for(int i=0; i < 20; i++)
     for(frostable& f : frosty)
     {
-        int red = 0;
-
         int ix = f.pos.x();
         int iy = win.get_window_size().y() - f.pos.y() - f.dim.y();
+
+        int red = 0;
 
         cl::args blur;
         blur.push_back(tex);
@@ -182,7 +183,7 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
         win.cqueue.exec("blur_image", blur, {f.dim.x()/2, f.dim.y()}, {16, 16});
 
-        red = 1;
+        red = (red + 1) % 2;
 
         cl::args blur2;
         blur2.push_back(tex);
@@ -202,6 +203,8 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
 void blend_buffers(render_window& win, cl::gl_rendertexture& out, cl::gl_rendertexture& in)
 {
+    glFinish();
+
     out.acquire(win.cqueue);
     in.acquire(win.cqueue);
 
@@ -224,9 +227,12 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
     render_window* win = (render_window*)cmd->UserCallbackData;
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.fbo);
+    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.fbo);
 
     #if 0
+    glFinish();
+
+    #if 1
     std::vector<frostable> frosty = win->get_frostables();
 
     std::cout << "Frosty Size " << frosty.size() << std::endl;
@@ -285,6 +291,9 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     win->cl_screen_tex.unacquire(win->cqueue);
     win->cqueue.block();
     #endif // 0
+    #endif // 0
+
+    blur_buffer(*win, win->cl_screen_tex);
 }
 
 void render_window::poll()
@@ -433,14 +442,15 @@ void render_window::display()
 
     glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);*/
 
-    blur_buffer(*this, cl_background_screen_tex);
-    blend_buffers(*this, cl_screen_tex, cl_background_screen_tex);
+    //blur_buffer(*this, cl_background_screen_tex);
+    //blend_buffers(*this, cl_screen_tex, cl_background_screen_tex);
 
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
 
     glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
+    glFinish();
     glfwSwapBuffers(rctx.window);
 }
 
