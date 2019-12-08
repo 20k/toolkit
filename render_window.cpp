@@ -34,8 +34,8 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
 }
@@ -166,6 +166,8 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
     tex.acquire(win.cqueue);
 
+    win.cl_image.clear(win.cqueue);
+
     for(int i=0; i < 40; i++)
     for(frostable& f : frosty)
     {
@@ -202,7 +204,7 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
     win.cqueue.block();
 }
 
-void blend_buffers(render_window& win, cl::gl_rendertexture& out, cl::gl_rendertexture& in)
+/*void blend_buffers(render_window& win, cl::gl_rendertexture& out, cl::gl_rendertexture& in)
 {
     glFinish();
 
@@ -222,7 +224,7 @@ void blend_buffers(render_window& win, cl::gl_rendertexture& out, cl::gl_rendert
     out.unacquire(win.cqueue);
 
     win.cqueue.block();
-}
+}*/
 
 void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
@@ -257,7 +259,7 @@ void render_window::poll()
 
     ImDrawList* draw = ImGui::GetBackgroundDrawList();
 
-    draw->AddCallback(pre_render, this);
+    //draw->AddCallback(pre_render, this);
 }
 
 std::vector<frostable> render_window::get_frostables()
