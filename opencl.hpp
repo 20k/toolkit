@@ -6,6 +6,7 @@
 #include <string>
 #include <cl/cl.h>
 #include <memory>
+#include <GL/glew.h>
 #include <gl/gl.h>
 #include <array>
 #include <vec/vec.hpp>
@@ -134,6 +135,8 @@ namespace cl
         base<cl_context, clRetainContext, clReleaseContext> native_context;
 
         context();
+        explicit context(bool); ///defer context creation
+
         void register_program(program& p);
     };
 

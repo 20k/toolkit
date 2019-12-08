@@ -20,26 +20,28 @@ void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-void init_screen_data(render_window& win)
+void init_screen_data(render_window& win, vec2i dim)
 {
-    int wx = win.get_window_size().x();
-    int wy = win.get_window_size().y();
+    int wx = dim.x();
+    int wy = dim.y();
 
-    glGenFramebuffers(1, &win.fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, win.fbo);
+    glGenFramebuffers(1, &win.rctx.fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, win.rctx.fbo);
 
-    glGenTextures(1, &win.screen_tex);
-    glBindTexture(GL_TEXTURE_2D, win.screen_tex);
+    glGenTextures(1, &win.rctx.screen_tex);
+    glBindTexture(GL_TEXTURE_2D, win.rctx.screen_tex);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, wx, wy, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, win.screen_tex, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, win.rctx.screen_tex, 0);
+
+    win.cl_screen_tex.create_from_texture(win.rctx.screen_tex);
 }
 
-render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags)
+render_context::render_context(vec2i dim, const std::string& window_title, window_flags::window_flags flags)
 {
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -107,40 +109,44 @@ render_window::render_window(vec2i dim, const std::string& window_title, window_
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    init_screen_data(*this);
+}
+
+render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx)
+{
+    init_screen_data(*this, dim);
 }
 
 vec2i render_window::get_window_size()
 {
-    assert(window);
+    assert(rctx.window);
 
     int display_w = 0;
     int display_h = 0;
 
-    glfwGetFramebufferSize(window, &display_w, &display_h);
+    glfwGetFramebufferSize(rctx.window, &display_w, &display_h);
 
     return {display_w, display_h};
 }
 
 vec2i render_window::get_window_position()
 {
-    assert(window);
+    assert(rctx.window);
 
     int wxpos = 0;
     int wypos = 0;
 
-    glfwGetWindowPos(window, &wxpos, &wypos);
+    glfwGetWindowPos(rctx.window, &wxpos, &wypos);
 
     return {wxpos, wypos};
 }
 
 void render_window::poll()
 {
-    assert(window);
+    assert(rctx.window);
 
     glfwPollEvents();
 
-    if(glfwWindowShouldClose(window))
+    if(glfwWindowShouldClose(rctx.window))
         closing = true;
 
     auto next_size = get_window_size();
@@ -149,7 +155,7 @@ void render_window::poll()
     {
         last_size = next_size;
 
-        init_screen_data(*this);
+        init_screen_data(*this, next_size);
     }
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -191,20 +197,20 @@ std::vector<frostable> render_window::get_frostables()
 
 void render_window::display()
 {
-    assert(window);
+    assert(rctx.window);
 
     ImGui::Render();
 
     vec2i dim = get_window_size();
 
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(rctx.window);
 
     glViewport(0, 0, dim.x(), dim.y());
 
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
     //glDrawBuffer(GL_BACK);
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, fbo);
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -216,11 +222,11 @@ void render_window::display()
     }
 
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
-    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, fbo);
+    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
 
     glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-    glfwSwapBuffers(window);
+    glfwSwapBuffers(rctx.window);
 }
 
 bool render_window::should_close()

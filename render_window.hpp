@@ -3,15 +3,11 @@
 
 #include <vec/vec.hpp>
 #include <imgui/imgui.h>
+#include "opencl.hpp"
 
 struct GLFWwindow;
 struct texture;
 struct vertex;
-
-namespace cl
-{
-    struct context;
-}
 
 namespace window_flags
 {
@@ -30,10 +26,23 @@ struct frostable
     vec2i dim;
 };
 
-struct render_window
+struct render_window;
+
+struct render_context
 {
     unsigned int fbo;
     unsigned int screen_tex;
+    GLFWwindow* window = nullptr;
+    ImFontAtlas atlas = {};
+
+    render_context(vec2i dim, const std::string& window_title, window_flags::window_flags flags);
+};
+
+struct render_window
+{
+    render_context rctx;
+    cl::context ctx;
+    cl::gl_rendertexture cl_screen_tex;
 
     render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags = window_flags::NONE);
 
@@ -62,9 +71,6 @@ struct render_window
 
     void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
     void render_texture(unsigned int handle, vec2f p_min, vec2f p_max);
-
-    GLFWwindow* window = nullptr;
-    ImFontAtlas atlas = {};
 
 private:
     bool closing = false;
