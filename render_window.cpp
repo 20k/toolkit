@@ -158,9 +158,9 @@ void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 
 void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 {
-    std::vector<frostable> frosty = win.get_frostables();
+    glFinish();
 
-    std::cout << "Frosty Size " << frosty.size() << std::endl;
+    std::vector<frostable> frosty = win.get_frostables();
 
     tex.acquire(win.cqueue);
 
@@ -168,13 +168,16 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
     {
         int red = 0;
 
+        int ix = f.pos.x();
+        int iy = win.get_window_size().y() - f.pos.y() - f.dim.y();
+
         cl::args blur;
         blur.push_back(tex);
         blur.push_back(tex);
         blur.push_back(f.dim.x());
         blur.push_back(f.dim.y());
-        blur.push_back(f.pos.x());
-        blur.push_back(f.pos.y());
+        blur.push_back(ix);
+        blur.push_back(iy);
         blur.push_back(red);
 
         win.cqueue.exec("blur_image", blur, {f.dim.x()/2, f.dim.y()}, {16, 16});
@@ -186,8 +189,8 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
         blur2.push_back(tex);
         blur2.push_back(f.dim.x());
         blur2.push_back(f.dim.y());
-        blur2.push_back(f.pos.x());
-        blur2.push_back(f.pos.y());
+        blur2.push_back(ix);
+        blur2.push_back(iy);
         blur2.push_back(red);
 
         win.cqueue.exec("blur_image", blur2, {f.dim.x()/2, f.dim.y()}, {16, 16});
