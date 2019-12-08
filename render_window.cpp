@@ -168,7 +168,7 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
     win.cl_image.clear(win.cqueue);
 
-    for(int i=0; i < 40; i++)
+    for(int i=0; i < 80; i++)
     for(frostable& f : frosty)
     {
         int ix = f.pos.x();

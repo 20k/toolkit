@@ -192,24 +192,47 @@ void cl::context::register_program(cl::program& p)
     }
 }
 
-cl::program::program(context& ctx, const std::string& data, bool is_file)
+cl::program::program(context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
 {
-    if(is_file && !file_exists(data))
-    {
-        throw std::runtime_error("No such file " + data);
-    }
 
-    std::string src;
+}
+
+cl::program::program(context& ctx, const std::vector<std::string>& data, bool is_file)
+{
+    if(data.size() == 0)
+        throw std::runtime_error("No Program Data (0 length data vector)");
 
     if(is_file)
-        src = read_file(data);
+    {
+        for(const auto& i : data)
+        {
+            if(!file_exists(i))
+                throw std::runtime_error("No such file " + i);
+        }
+    }
+
+    std::vector<std::string> src;
+
+    if(is_file)
+    {
+        for(const auto& i : data)
+        {
+            src.push_back(read_file(i));
+        }
+    }
     else
+    {
         src = data;
+    }
 
-    size_t len = src.size();
-    const char* ptr = src.c_str();
+    std::vector<const char*> data_ptrs;
 
-    native_program.data = clCreateProgramWithSource(ctx.native_context.data, 1, &ptr, &len, nullptr);
+    for(const auto& i : src)
+    {
+        data_ptrs.push_back(i.c_str());
+    }
+
+    native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
 void cl::program::build(context& ctx, const std::string& options)

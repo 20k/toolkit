@@ -145,6 +145,7 @@ namespace cl
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
 
         program(context& ctx, const std::string& data, bool is_file = true);
+        program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
         void build(context& ctx, const std::string& options);
     };
 
