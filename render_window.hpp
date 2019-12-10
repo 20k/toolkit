@@ -10,17 +10,28 @@ struct GLFWwindow;
 struct texture;
 struct vertex;
 
-namespace window_flags
+/*namespace window_flags
 {
     enum window_flags
     {
         NONE = 0,
         SRGB = 1,
-        DOUBLE_BUFFER = 2,
+        NO_DOUBLE_BUFFER = 2,
         VIEWPORTS = 4,
         OPENCL = 8,
     };
-}
+}*/
+
+struct render_settings : serialisable, free_function
+{
+    int width = 0;
+    int height = 0;
+
+    bool is_srgb = false;
+    bool no_double_buffer = false;
+    bool viewports = false;
+    bool opencl = false;
+};
 
 struct frostable
 {
@@ -36,7 +47,7 @@ struct render_context
     GLFWwindow* window = nullptr;
     ImFontAtlas atlas = {};
 
-    render_context(vec2i dim, const std::string& window_title, window_flags::window_flags flags);
+    render_context(const render_settings& sett, const std::string& window_title);
 };
 
 struct opencl_context
@@ -49,19 +60,11 @@ struct opencl_context
     opencl_context();
 };
 
-struct render_settings : serialisable, free_function
-{
-    int width = 0;
-    int height = 0;
-    window_flags::window_flags flags = window_flags::NONE;
-};
-
 struct render_window
 {
     render_context rctx;
     opencl_context* clctx = nullptr;
 
-    render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags = window_flags::NONE);
     render_window(const render_settings& sett, const std::string& window_title);
     ~render_window();
 
@@ -84,7 +87,7 @@ struct render_window
 private:
     bool closing = false;
     vec2i last_size;
-    window_flags::window_flags current_flags = window_flags::NONE;
+    render_settings settings;
 };
 
 namespace gui

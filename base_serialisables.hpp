@@ -1,0 +1,8 @@
+#ifndef BASE_SERIALISABLES_HPP_INCLUDED
+#define BASE_SERIALISABLES_HPP_INCLUDED
+
+#include <networking/serialisable_fwd.hpp>
+
+DECLARE_SERIALISE_FUNCTION(render_settings);
+
+#endif // BASE_SERIALISABLES_HPP_INCLUDED

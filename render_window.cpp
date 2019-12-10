@@ -32,7 +32,7 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
     glGenTextures(1, tex);
     glBindTexture(GL_TEXTURE_2D, *tex);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -51,7 +51,7 @@ void init_screen_data(render_window& win, vec2i dim)
     }
 }
 
-render_context::render_context(vec2i dim, const std::string& window_title, window_flags::window_flags flags)
+render_context::render_context(const render_settings& sett, const std::string& window_title)
 {
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -62,17 +62,17 @@ render_context::render_context(vec2i dim, const std::string& window_title, windo
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 
-    if(flags & window_flags::DOUBLE_BUFFER)
+    if(sett.no_double_buffer)
         glfwWindowHint( GLFW_DOUBLEBUFFER, GL_FALSE );
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
     //glfwWindowHint(GLFW_SAMPLES, 8);
 
-    if(flags & window_flags::SRGB)
+    if(sett.is_srgb)
         glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 
-    window = glfwCreateWindow(dim.x(), dim.y(), window_title.c_str(), nullptr, nullptr);
+    window = glfwCreateWindow(sett.width, sett.height, window_title.c_str(), nullptr, nullptr);
 
     if(window == nullptr)
         throw std::runtime_error("Nullptr window in glfw");
@@ -91,7 +91,7 @@ render_context::render_context(vec2i dim, const std::string& window_title, windo
 
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    if(flags & window_flags::VIEWPORTS)
+    if(sett.viewports)
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ImGuiStyle& style = ImGui::GetStyle();
@@ -109,7 +109,7 @@ render_context::render_context(vec2i dim, const std::string& window_title, windo
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    if(flags & window_flags::SRGB)
+    if(sett.is_srgb)
         ImGui::SetStyleLinearColor(true);
 
     io.Fonts->Clear();
@@ -125,21 +125,16 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 
 }
 
-render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags)
+render_window::render_window(const render_settings& sett, const std::string& window_title) : rctx(sett, window_title)
 {
-    current_flags = flags;
+    settings = sett;
 
-    if(flags & window_flags::OPENCL)
+    if(sett.opencl)
     {
         clctx = new opencl_context;
     }
 
-    init_screen_data(*this, dim);
-}
-
-render_window::render_window(const render_settings& sett, const std::string& window_title) : render_window({sett.width, sett.height}, window_title, sett.flags)
-{
-
+    init_screen_data(*this, {sett.width, sett.height});
 }
 
 render_window::~render_window()
@@ -160,13 +155,12 @@ render_window::~render_window()
 
 render_settings render_window::get_render_settings()
 {
-    render_settings sett;
+    render_settings sett = settings;
 
     auto dim = get_window_size();
 
     sett.width = dim.x();
     sett.height = dim.y();
-    sett.flags = current_flags;
 
     return sett;
 }
@@ -355,6 +349,8 @@ void render_window::display()
         glfwMakeContextCurrent(backup_current_context);
     }
 
+    if(ImGui::GetCurrentContext()->IsLinearColor)
+        glEnable(GL_FRAMEBUFFER_SRGB);
 
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
@@ -363,6 +359,9 @@ void render_window::display()
 
     glFinish();
     glfwSwapBuffers(rctx.window);
+
+    if(ImGui::GetCurrentContext()->IsLinearColor)
+        glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 bool render_window::should_close()
