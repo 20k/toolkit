@@ -43,10 +43,8 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
 void init_screen_data(render_window& win, vec2i dim)
 {
     make_fbo(&win.rctx.fbo, &win.rctx.screen_tex, dim);
-    make_fbo(&win.rctx.background_fbo, &win.rctx.background_screen_tex, dim);
 
     win.cl_screen_tex.create_from_texture(win.rctx.screen_tex);
-    win.cl_background_screen_tex.create_from_texture(win.rctx.background_screen_tex);
     win.cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
 }
 
@@ -120,7 +118,7 @@ render_context::render_context(vec2i dim, const std::string& window_title, windo
 
 }
 
-render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx), cl_background_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
 {
     init_screen_data(*this, dim);
 }

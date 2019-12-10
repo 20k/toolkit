@@ -33,9 +33,6 @@ struct render_context
     unsigned int fbo;
     unsigned int screen_tex;
 
-    unsigned int background_fbo;
-    unsigned int background_screen_tex;
-
     GLFWwindow* window = nullptr;
     ImFontAtlas atlas = {};
 
@@ -47,7 +44,6 @@ struct render_window
     render_context rctx;
     cl::context ctx;
     cl::gl_rendertexture cl_screen_tex;
-    cl::gl_rendertexture cl_background_screen_tex;
     cl::command_queue cqueue;
     cl::image cl_image;
 
