@@ -61,12 +61,13 @@ struct render_window
     vec2i get_window_size();
     vec2i get_window_position();
 
-    void poll();
+    void poll(double maximum_sleep_s = 0);
 
     std::vector<frostable> get_frostables();
 
     void display();
     bool should_close();
+    void close();
 
     void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
     void render_texture(unsigned int handle, vec2f p_min, vec2f p_max);

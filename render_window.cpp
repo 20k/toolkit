@@ -142,6 +142,13 @@ render_window::~render_window()
         delete clctx;
         clctx = nullptr;
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(rctx.window);
+    glfwTerminate();
 }
 
 vec2i render_window::get_window_size()
@@ -232,11 +239,11 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     blur_buffer(*win, win->clctx->cl_screen_tex);
 }
 
-void render_window::poll()
+void render_window::poll(double maximum_sleep_s)
 {
     assert(rctx.window);
 
-    glfwPollEvents();
+    glfwWaitEventsTimeout(maximum_sleep_s);
 
     if(glfwWindowShouldClose(rctx.window))
         closing = true;
@@ -341,6 +348,11 @@ void render_window::display()
 bool render_window::should_close()
 {
     return closing;
+}
+
+void render_window::close()
+{
+    closing = true;
 }
 
 void render_window::render(const std::vector<vertex>& vertices, texture* tex)
