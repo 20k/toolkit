@@ -127,12 +127,19 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 
 render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags)
 {
+    current_flags = flags;
+
     if(flags & window_flags::OPENCL)
     {
         clctx = new opencl_context;
     }
 
     init_screen_data(*this, dim);
+}
+
+render_window::render_window(const render_settings& sett, const std::string& window_title) : render_window({sett.width, sett.height}, window_title, sett.flags)
+{
+
 }
 
 render_window::~render_window()
@@ -149,6 +156,19 @@ render_window::~render_window()
 
     glfwDestroyWindow(rctx.window);
     glfwTerminate();
+}
+
+render_settings render_window::get_render_settings()
+{
+    render_settings sett;
+
+    auto dim = get_window_size();
+
+    sett.width = dim.x();
+    sett.height = dim.y();
+    sett.flags = current_flags;
+
+    return sett;
 }
 
 vec2i render_window::get_window_size()

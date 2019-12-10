@@ -4,6 +4,7 @@
 #include <vec/vec.hpp>
 #include <imgui/imgui.h>
 #include "opencl.hpp"
+#include <networking/serialisable_fwd.hpp>
 
 struct GLFWwindow;
 struct texture;
@@ -27,8 +28,6 @@ struct frostable
     vec2i dim;
 };
 
-struct render_window;
-
 struct render_context
 {
     unsigned int fbo;
@@ -50,13 +49,23 @@ struct opencl_context
     opencl_context();
 };
 
+struct render_settings : serialisable, free_function
+{
+    int width = 0;
+    int height = 0;
+    window_flags::window_flags flags = window_flags::NONE;
+};
+
 struct render_window
 {
     render_context rctx;
     opencl_context* clctx = nullptr;
 
     render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags = window_flags::NONE);
+    render_window(const render_settings& sett, const std::string& window_title);
     ~render_window();
+
+    render_settings get_render_settings();
 
     vec2i get_window_size();
     vec2i get_window_position();
@@ -75,6 +84,7 @@ struct render_window
 private:
     bool closing = false;
     vec2i last_size;
+    window_flags::window_flags current_flags = window_flags::NONE;
 };
 
 namespace gui
