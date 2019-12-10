@@ -32,7 +32,7 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
     glGenTextures(1, tex);
     glBindTexture(GL_TEXTURE_2D, *tex);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -316,6 +316,84 @@ std::vector<frostable> render_window::get_frostables()
 
     return frosts;
 }
+
+/*
+template<int N, typename T>
+inline
+constexpr vec<N, T> lin_to_srgb_approx(const vec<N, T>& in)
+{
+    vec<N, T> S1 = sqrtf(in);
+    vec<N, T> S2 = sqrtf(S1);
+    vec<N, T> S3 = sqrtf(S2);
+
+    return 0.662002687f * S1 + 0.684122060f * S2 - 0.323583601f * S3 - 0.0225411470f * in;
+}
+*/
+
+/*"uniform mat4 ProjMtx;\n"
+        "in vec2 Position;\n"
+        "in vec2 UV;\n"
+        "in vec4 Color;\n"
+        "out vec2 Frag_UV;\n"
+        "out vec4 Frag_Color;\n"
+        "void main()\n"
+        "{\n"
+        "    Frag_UV = UV;\n"
+        "    Frag_Color = Color;\n"
+        "    gl_Position = ProjMtx * vec4(Position.xy,0,1);\n"
+        "}\n";*/
+
+/*const GLchar* fragment_shader_glsl_130 =
+        "uniform sampler2D Texture;\n"
+        "in vec2 Frag_UV;\n"
+        "in vec4 Frag_Color;\n"
+        "out vec4 Out_Color_0;\n"
+        "out vec4 Out_Color_1;\n"
+        "void main()\n"
+        "{\n"
+        "   vec4 tex_col4 = texture(Texture, Frag_UV.st);\n"
+        "   Out_Color_0 = Frag_Color * tex_col4;\n"
+        "   Out_Color_1 = 1 - tex_col4;\n"
+        "}\n";*/
+
+static const char* vert_shader =
+        "uniform mat4 ProjMtx;\n"
+        "in vec2 Position;\n"
+        "in vec2 UV;\n"
+        "in vec4 Color;\n"
+        "out vec2 Frag_UV;\n"
+        "out vec4 Frag_Color;\n"
+        "void main()\n"
+        "{\n"
+        "    Frag_UV = UV;\n"
+        "    Frag_Color = Color;\n"
+        "    gl_Position = ProjMtx * vec4(Position.xy,0,1);\n"
+        "}\n";
+
+static const char* fragment_shader_explicit =
+        "uniform sampler2D Texture;\n"
+        "in vec2 Frag_UV;\n"
+        "in vec4 Frag_Color;\n"
+        "out vec4 Out_Color_0;\n"
+        "void main()\n"
+        "{\n"
+        "   vec4 tex_col4 = texture(Texture, Frag_UV.st);\n"
+        "   vec3 s1 = sqrt(tex_col4.xyz);\n"
+        "   vec3 s2 = sqrt(s1);\n"
+        "   vec3 s3 = sqrt(s2);\n"
+        "   Out_Color_0 = (vec4)(0.662002687f * S1 + 0.684122060f * S2 - 0.323583601f * S3 - 0.0225411470f * tex_col4.xyz, tex_col4.w);\n"
+        "}\n";
+
+static const char* fragment_shader_implicit =
+        "uniform sampler2D Texture;\n"
+        "in vec2 Frag_UV;\n"
+        "in vec4 Frag_Color;\n"
+        "out vec4 Out_Color_0;\n"
+        "void main()\n"
+        "{\n"
+        "   vec4 tex_col4 = texture(Texture, Frag_UV.st);\n"
+        "   Out_Color_0 = tex_col4;\n"
+        "}\n";
 
 void render_window::display()
 {
