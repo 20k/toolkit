@@ -44,8 +44,11 @@ void init_screen_data(render_window& win, vec2i dim)
 {
     make_fbo(&win.rctx.fbo, &win.rctx.screen_tex, dim);
 
-    win.cl_screen_tex.create_from_texture(win.rctx.screen_tex);
-    win.cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
+    if(win.clctx)
+    {
+        win.clctx->cl_screen_tex.create_from_texture(win.rctx.screen_tex);
+        win.clctx->cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
+    }
 }
 
 render_context::render_context(vec2i dim, const std::string& window_title, window_flags::window_flags flags)
@@ -115,12 +118,30 @@ render_context::render_context(vec2i dim, const std::string& window_title, windo
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+}
+
+opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+{
 
 }
 
-render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags), ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+render_window::render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags) : rctx(dim, window_title, flags)
 {
+    if(flags & window_flags::OPENCL)
+    {
+        clctx = new opencl_context;
+    }
+
     init_screen_data(*this, dim);
+}
+
+render_window::~render_window()
+{
+    if(clctx)
+    {
+        delete clctx;
+        clctx = nullptr;
+    }
 }
 
 vec2i render_window::get_window_size()
@@ -162,9 +183,9 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 
     std::vector<frostable> frosty = win.get_frostables();
 
-    tex.acquire(win.cqueue);
+    tex.acquire(win.clctx->cqueue);
 
-    win.cl_image.clear(win.cqueue);
+    win.clctx->cl_image.clear(win.clctx->cqueue);
 
     for(int i=0; i < 80; i++)
     for(frostable& f : frosty)
@@ -178,35 +199,37 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
         cl::args blur;
 
         blur.push_back(tex);
-        blur.push_back(win.cl_image);
+        blur.push_back(win.clctx->cl_image);
         blur.push_back(dx);
         blur.push_back(dy);
         blur.push_back(ix);
         blur.push_back(iy);
 
-        win.cqueue.exec("blur_image", blur, {dx, dy}, {16, 16});
+        win.clctx->cqueue.exec("blur_image", blur, {dx, dy}, {16, 16});
 
         cl::args blur2;
 
-        blur2.push_back(win.cl_image);
+        blur2.push_back(win.clctx->cl_image);
         blur2.push_back(tex);
         blur2.push_back(dx);
         blur2.push_back(dy);
         blur2.push_back(ix);
         blur2.push_back(iy);
 
-        win.cqueue.exec("blur_image", blur2, {dx, dy}, {16, 16});
+        win.clctx->cqueue.exec("blur_image", blur2, {dx, dy}, {16, 16});
     }
 
-    tex.unacquire(win.cqueue);
-    win.cqueue.block();
+    tex.unacquire(win.clctx->cqueue);
+    win.clctx->cqueue.block();
 }
 
 void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
     render_window* win = (render_window*)cmd->UserCallbackData;
 
-    blur_buffer(*win, win->cl_screen_tex);
+    assert(win->clctx);
+
+    blur_buffer(*win, win->clctx->cl_screen_tex);
 }
 
 void render_window::poll()
@@ -277,7 +300,10 @@ void render_window::display()
 {
     assert(rctx.window);
 
-    ImGui::GetBackgroundDrawList()->AddCallback(post_render, this);
+    if(clctx)
+    {
+        ImGui::GetBackgroundDrawList()->AddCallback(post_render, this);
+    }
 
     ImGui::Render();
 

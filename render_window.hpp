@@ -17,6 +17,7 @@ namespace window_flags
         SRGB = 1,
         DOUBLE_BUFFER = 2,
         VIEWPORTS = 4,
+        OPENCL = 8,
     };
 }
 
@@ -39,15 +40,23 @@ struct render_context
     render_context(vec2i dim, const std::string& window_title, window_flags::window_flags flags);
 };
 
-struct render_window
+struct opencl_context
 {
-    render_context rctx;
     cl::context ctx;
     cl::gl_rendertexture cl_screen_tex;
     cl::command_queue cqueue;
     cl::image cl_image;
 
+    opencl_context();
+};
+
+struct render_window
+{
+    render_context rctx;
+    opencl_context* clctx = nullptr;
+
     render_window(vec2i dim, const std::string& window_title, window_flags::window_flags flags = window_flags::NONE);
+    ~render_window();
 
     vec2i get_window_size();
     vec2i get_window_position();
