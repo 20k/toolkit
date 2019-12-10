@@ -202,33 +202,9 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
     win.cqueue.block();
 }
 
-/*void blend_buffers(render_window& win, cl::gl_rendertexture& out, cl::gl_rendertexture& in)
-{
-    glFinish();
-
-    out.acquire(win.cqueue);
-    in.acquire(win.cqueue);
-
-    cl::args blendo;
-    blendo.push_back(out);
-    blendo.push_back(in);
-    blendo.push_back(out);
-
-    auto dim = win.get_window_size();
-
-    win.cqueue.exec("blend", blendo, {dim.x(), dim.y()}, {16, 16});
-
-    in.unacquire(win.cqueue);
-    out.unacquire(win.cqueue);
-
-    win.cqueue.block();
-}*/
-
 void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
     render_window* win = (render_window*)cmd->UserCallbackData;
-
-    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.fbo);
 
     blur_buffer(*win, win->cl_screen_tex);
 }
@@ -255,8 +231,7 @@ void render_window::poll()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImDrawList* draw = ImGui::GetBackgroundDrawList();
-
+    //ImDrawList* draw = ImGui::GetBackgroundDrawList();
     //draw->AddCallback(pre_render, this);
 }
 
@@ -312,10 +287,6 @@ void render_window::display()
 
     glViewport(0, 0, dim.x(), dim.y());
 
-    /*glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.background_fbo);
-    glClearColor(0,0,0,1);
-    glClear(GL_COLOR_BUFFER_BIT);*/
-
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -331,19 +302,6 @@ void render_window::display()
         glfwMakeContextCurrent(backup_current_context);
     }
 
-    //handle_frosting(*this);
-
-    /*glEnable(GL_BLEND);
-    glBlendEquation(GL_FUNC_ADD);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
-    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.background_fbo);
-
-    glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);*/
-
-    //blur_buffer(*this, cl_background_screen_tex);
-    //blend_buffers(*this, cl_screen_tex, cl_background_screen_tex);
 
     glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
