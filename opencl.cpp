@@ -2,12 +2,17 @@
 #include "opencl.hpp"
 #include <stdexcept>
 #include <string.h>
-#include <cl/cl_gl.h>
-#include <gl/gl.h>
+#include <CL/cl_gl.h>
+#include <GL/gl.h>
 #include <fstream>
 #include <iostream>
 #include <assert.h>
+
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <GL/glx.h>
+#endif
 
 #define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
 
@@ -142,6 +147,7 @@ cl::context::context()
 
     selected_device = devices[0];
 
+    #ifdef _WIN32
     cl_context_properties props[] =
     {
         CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
@@ -149,6 +155,15 @@ cl::context::context()
         CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
         0
     };
+    #else
+    cl_context_properties props[] =
+    {
+        CL_GL_CONTEXT_KHR, (cl_context_properties)glXGetCurrentContext(),
+        CL_GLX_DISPLAY_KHR, (cl_context_properties)glXGetCurrentDisplay(),
+        CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
+        0
+    };
+    #endif
 
     cl_int error = 0;
 
@@ -496,13 +511,6 @@ void cl::gl_rendertexture::create(int _w, int _h)
 {
     w = _w;
     h = _h;
-
-    PFNGLGENFRAMEBUFFERSEXTPROC glGenFramebuffersEXT = (PFNGLGENFRAMEBUFFERSEXTPROC)wglGetProcAddress("glGenFramebuffersEXT");
-    PFNGLBINDFRAMEBUFFEREXTPROC glBindFramebufferEXT = (PFNGLBINDFRAMEBUFFEREXTPROC)wglGetProcAddress("glBindFramebufferEXT");
-    PFNGLGENRENDERBUFFERSEXTPROC glGenRenderbuffersEXT = (PFNGLGENRENDERBUFFERSEXTPROC)wglGetProcAddress("glGenRenderbuffersEXT");
-    PFNGLBINDRENDERBUFFEREXTPROC glBindRenderbufferEXT = (PFNGLBINDRENDERBUFFEREXTPROC)wglGetProcAddress("glBindRenderbufferEXT");
-    PFNGLRENDERBUFFERSTORAGEEXTPROC glRenderbufferStorageEXT = (PFNGLRENDERBUFFERSTORAGEEXTPROC)wglGetProcAddress("glRenderbufferStorageEXT");
-    PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC glFramebufferRenderbufferEXT = (PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC)wglGetProcAddress("glFramebufferRenderbufferEXT");
 
     GLuint fbo;
     glGenFramebuffersEXT(1, &fbo);
