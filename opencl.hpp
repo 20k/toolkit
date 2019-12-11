@@ -4,10 +4,10 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <cl/cl.h>
+#include <CL/cl.h>
 #include <memory>
 #include <GL/glew.h>
-#include <gl/gl.h>
+#include <GL/gl.h>
 #include <array>
 #include <vec/vec.hpp>
 #include <assert.h>
