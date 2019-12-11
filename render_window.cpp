@@ -432,23 +432,31 @@ void render_window::display()
     }
 
     if(ImGui::GetCurrentContext()->IsLinearColor)
+    {
         glEnable(GL_FRAMEBUFFER_SRGB);
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo_srgb);
-    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
+        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo_srgb);
+        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
 
-    glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
-    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo_srgb);
+        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo_srgb);
 
-    glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+        glDisable(GL_FRAMEBUFFER_SRGB);
+    }
+    else
+    {
+        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
+
+        glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
 
     glFinish();
     glfwSwapBuffers(rctx.window);
-
-    if(ImGui::GetCurrentContext()->IsLinearColor)
-        glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 bool render_window::should_close()
