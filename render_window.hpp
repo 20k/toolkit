@@ -44,6 +44,9 @@ struct render_context
     unsigned int fbo;
     unsigned int screen_tex;
 
+    unsigned int fbo_srgb;
+    unsigned int screen_tex_srgb;
+
     GLFWwindow* window = nullptr;
     ImFontAtlas atlas = {};
 

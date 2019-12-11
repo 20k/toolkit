@@ -21,7 +21,7 @@ void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
+void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 {
     int wx = dim.x();
     int wy = dim.y();
@@ -32,7 +32,10 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
     glGenTextures(1, tex);
     glBindTexture(GL_TEXTURE_2D, *tex);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
+    if(!is_srgb)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
+    else
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, wx, wy, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -42,7 +45,8 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim)
 
 void init_screen_data(render_window& win, vec2i dim)
 {
-    make_fbo(&win.rctx.fbo, &win.rctx.screen_tex, dim);
+    make_fbo(&win.rctx.fbo, &win.rctx.screen_tex, dim, false);
+    make_fbo(&win.rctx.fbo_srgb, &win.rctx.screen_tex_srgb, dim, true);
 
     if(win.clctx)
     {
@@ -430,8 +434,13 @@ void render_window::display()
     if(ImGui::GetCurrentContext()->IsLinearColor)
         glEnable(GL_FRAMEBUFFER_SRGB);
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo_srgb);
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
+
+    glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo_srgb);
 
     glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
