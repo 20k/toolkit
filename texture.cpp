@@ -1,6 +1,6 @@
 #include "texture.hpp"
-#include <gl/glew.h>
-#include <gl/gl.h>
+#include <GL/glew.h>
+#include <GL/gl.h>
 
 void texture::load_from_memory(const uint8_t* pixels_rgba, vec2i _dim)
 {
