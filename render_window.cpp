@@ -214,9 +214,12 @@ void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 ///unconditionally blur whole screen, then only clip bits we want
 void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 {
-    glFinish();
-
     std::vector<frostable> frosty = win.get_frostables();
+
+    if(frosty.size() == 0)
+        return;
+
+    glFinish();
 
     tex.acquire(win.clctx->cqueue);
 
