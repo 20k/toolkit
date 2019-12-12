@@ -193,6 +193,16 @@ vec2i render_window::get_window_position()
     return {wxpos, wypos};
 }
 
+void render_window::set_srgb(bool enabled)
+{
+    if(enabled == settings.is_srgb)
+        return;
+
+    settings.is_srgb = enabled;
+
+    ImGui::SetStyleLinearColor(settings.is_srgb);
+}
+
 void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
     render_window* win = (render_window*)cmd->UserCallbackData;

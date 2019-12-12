@@ -76,6 +76,8 @@ struct render_window
     vec2i get_window_size();
     vec2i get_window_position();
 
+    void set_srgb(bool enabled);
+
     void poll(double maximum_sleep_s = 0);
 
     std::vector<frostable> get_frostables();
