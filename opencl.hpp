@@ -193,12 +193,17 @@ namespace cl
         }
     };
 
-    struct image : mem_object
+    struct image_base : mem_object
+    {
+        void clear(cl::command_queue& cqueue);
+        std::array<int64_t, 3> sizes = {1, 1, 1};
+    };
+
+    struct image : image_base
     {
         base<cl_context, clRetainContext, clReleaseContext> native_context;
 
         int dimensions = 1;
-        std::array<int64_t, 3> sizes = {1, 1, 1};
 
         image(cl::context& ctx);
 
@@ -236,8 +241,6 @@ namespace cl
             return alloc_impl(init.size(), storage, format);
         }
 
-        void clear(cl::command_queue& cqueue);
-
         /*void write(command_queue& write_on, const char* ptr, int64_t bytes);
 
         template<typename T>
@@ -262,12 +265,10 @@ namespace cl
         void block();
     };
 
-    struct gl_rendertexture : mem_object
+    struct gl_rendertexture : image_base
     {
         bool acquired = false;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
-        int w = 0;
-        int h = 0;
 
         GLuint texture_id = 0;
 

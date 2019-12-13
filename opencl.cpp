@@ -373,7 +373,7 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
     native_mem_object.data = ret;
 }
 
-void cl::image::clear(cl::command_queue& cqueue)
+void cl::image_base::clear(cl::command_queue& cqueue)
 {
     char everything_zero[sizeof(double) * 4] = {0};
 
@@ -509,8 +509,8 @@ cl::gl_rendertexture::gl_rendertexture(context& ctx)
 
 void cl::gl_rendertexture::create(int _w, int _h)
 {
-    w = _w;
-    h = _h;
+    sizes[0] = _w;
+    sizes[1] = _h;
 
     GLuint fbo;
     glGenFramebuffersEXT(1, &fbo);
@@ -519,7 +519,7 @@ void cl::gl_rendertexture::create(int _w, int _h)
     glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_2D, texture_id);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sizes[0], sizes[1], 0, GL_RGBA, GL_FLOAT, nullptr);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
