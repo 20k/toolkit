@@ -422,9 +422,15 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 
 }
 
-render_window::render_window(const render_settings& sett, const std::string& window_title)
+render_window::render_window(const render_settings& sett, const std::string& window_title, backend_type::type type)
 {
-    backend = new glfw_backend(sett, window_title);
+    if(type == backend_type::GLFW)
+        backend = new glfw_backend(sett, window_title);
+
+    #ifdef USE_IMTUI
+    if(type == backend_type::IMTUI)
+        backend = new imtui_backend(sett, window_title);
+    #endif // USE_IMTUI
 
     settings = sett;
 

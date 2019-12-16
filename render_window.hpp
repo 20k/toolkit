@@ -34,6 +34,15 @@ struct render_settings : serialisable, free_function
     bool opencl = false;
 };
 
+namespace backend_type
+{
+    enum type
+    {
+        GLFW,
+        IMTUI,
+    };
+}
+
 struct frostable
 {
     vec2f pos;
@@ -140,7 +149,7 @@ struct render_window
     generic_backend* backend = nullptr;
     opencl_context* clctx = nullptr;
 
-    render_window(const render_settings& sett, const std::string& window_title);
+    render_window(const render_settings& sett, const std::string& window_title, backend_type::type type = backend_type::GLFW);
     ~render_window();
 
     render_settings get_render_settings();
