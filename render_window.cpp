@@ -43,19 +43,7 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
 }
 
-void init_screen_data(render_window& win, vec2i dim)
-{
-    make_fbo(&win.rctx.fbo, &win.rctx.screen_tex, dim, false);
-    make_fbo(&win.rctx.fbo_srgb, &win.rctx.screen_tex_srgb, dim, true);
-
-    if(win.clctx)
-    {
-        win.clctx->cl_screen_tex.create_from_texture(win.rctx.screen_tex);
-        win.clctx->cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
-    }
-}
-
-render_context::render_context(const render_settings& sett, const std::string& window_title)
+glfw_render_context::glfw_render_context(const render_settings& sett, const std::string& window_title)
 {
     glfwSetErrorCallback(glfw_error_callback);
 
@@ -85,7 +73,6 @@ render_context::render_context(const render_settings& sett, const std::string& w
 
     if(glewInit() != GLEW_OK)
         throw std::runtime_error("Bad Glew");
-
 
     ImGui::CreateContext(&atlas);
 
@@ -124,37 +111,73 @@ render_context::render_context(const render_settings& sett, const std::string& w
     ImGui_ImplOpenGL3_Init(glsl_version);
 }
 
-opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+glfw_render_context::~glfw_render_context()
+{
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}
+
+glfw_backend::glfw_backend(const render_settings& sett, const std::string& window_title) : ctx(sett, window_title)
 {
 
 }
 
-render_window::render_window(const render_settings& sett, const std::string& window_title) : rctx(sett, window_title)
+void glfw_backend::init_screen(vec2i dim)
 {
-    settings = sett;
+    make_fbo(&ctx.fbo, &ctx.screen_tex, dim, false);
+    make_fbo(&ctx.fbo_srgb, &ctx.screen_tex_srgb, dim, true);
 
-    if(sett.opencl)
+    if(clctx)
     {
-        clctx = new opencl_context;
+        clctx->cl_screen_tex.create_from_texture(ctx.screen_tex);
+        clctx->cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
     }
-
-    init_screen_data(*this, {sett.width, sett.height});
 }
 
-render_window::~render_window()
+glfw_backend::~glfw_backend()
 {
     if(clctx)
     {
         delete clctx;
         clctx = nullptr;
     }
+}
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+opencl_context* glfw_backend::get_opencl_context()
+{
+    return clctx;
+}
 
-    glfwDestroyWindow(rctx.window);
-    glfwTerminate();
+opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+{
+
+}
+
+render_window::render_window(const render_settings& sett, const std::string& window_title)
+{
+    backend = new glfw_backend(sett, window_title);
+
+    settings = sett;
+
+    if(sett.opencl && backend->get_opencl_context())
+    {
+        clctx = backend->get_opencl_context();
+    }
+
+    backend->init_screen({sett.width, sett.height});
+}
+
+render_window::~render_window()
+{
+    if(backend)
+    {
+        delete backend;
+        backend = nullptr;
+    }
 }
 
 render_settings render_window::get_render_settings()
@@ -169,26 +192,26 @@ render_settings render_window::get_render_settings()
     return sett;
 }
 
-vec2i render_window::get_window_size()
+vec2i glfw_backend::get_window_size()
 {
-    assert(rctx.window);
+    assert(ctx.window);
 
     int display_w = 0;
     int display_h = 0;
 
-    glfwGetFramebufferSize(rctx.window, &display_w, &display_h);
+    glfwGetFramebufferSize(ctx.window, &display_w, &display_h);
 
     return {display_w, display_h};
 }
 
-vec2i render_window::get_window_position()
+vec2i glfw_backend::get_window_position()
 {
-    assert(rctx.window);
+    assert(ctx.window);
 
     int wxpos = 0;
     int wypos = 0;
 
-    glfwGetWindowPos(rctx.window, &wxpos, &wypos);
+    glfwGetWindowPos(ctx.window, &wxpos, &wypos);
 
     return {wxpos, wypos};
 }
@@ -267,13 +290,13 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     blur_buffer(*win, win->clctx->cl_screen_tex);
 }
 
-void render_window::poll(double maximum_sleep_s)
+void glfw_backend::poll(double maximum_sleep_s)
 {
-    assert(rctx.window);
+    assert(ctx.window);
 
     glfwWaitEventsTimeout(maximum_sleep_s);
 
-    if(glfwWindowShouldClose(rctx.window))
+    if(glfwWindowShouldClose(ctx.window))
         closing = true;
 
     auto next_size = get_window_size();
@@ -282,7 +305,7 @@ void render_window::poll(double maximum_sleep_s)
     {
         last_size = next_size;
 
-        init_screen_data(*this, next_size);
+        init_screen(next_size);
     }
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -331,87 +354,9 @@ std::vector<frostable> render_window::get_frostables()
     return frosts;
 }
 
-/*
-template<int N, typename T>
-inline
-constexpr vec<N, T> lin_to_srgb_approx(const vec<N, T>& in)
+void glfw_backend::display()
 {
-    vec<N, T> S1 = sqrtf(in);
-    vec<N, T> S2 = sqrtf(S1);
-    vec<N, T> S3 = sqrtf(S2);
-
-    return 0.662002687f * S1 + 0.684122060f * S2 - 0.323583601f * S3 - 0.0225411470f * in;
-}
-*/
-
-/*"uniform mat4 ProjMtx;\n"
-        "in vec2 Position;\n"
-        "in vec2 UV;\n"
-        "in vec4 Color;\n"
-        "out vec2 Frag_UV;\n"
-        "out vec4 Frag_Color;\n"
-        "void main()\n"
-        "{\n"
-        "    Frag_UV = UV;\n"
-        "    Frag_Color = Color;\n"
-        "    gl_Position = ProjMtx * vec4(Position.xy,0,1);\n"
-        "}\n";*/
-
-/*const GLchar* fragment_shader_glsl_130 =
-        "uniform sampler2D Texture;\n"
-        "in vec2 Frag_UV;\n"
-        "in vec4 Frag_Color;\n"
-        "out vec4 Out_Color_0;\n"
-        "out vec4 Out_Color_1;\n"
-        "void main()\n"
-        "{\n"
-        "   vec4 tex_col4 = texture(Texture, Frag_UV.st);\n"
-        "   Out_Color_0 = Frag_Color * tex_col4;\n"
-        "   Out_Color_1 = 1 - tex_col4;\n"
-        "}\n";*/
-
-static const char* vert_shader =
-        "uniform mat4 ProjMtx;\n"
-        "in vec2 Position;\n"
-        "in vec2 UV;\n"
-        "in vec4 Color;\n"
-        "out vec2 Frag_UV;\n"
-        "out vec4 Frag_Color;\n"
-        "void main()\n"
-        "{\n"
-        "    Frag_UV = UV;\n"
-        "    Frag_Color = Color;\n"
-        "    gl_Position = ProjMtx * vec4(Position.xy,0,1);\n"
-        "}\n";
-
-static const char* fragment_shader_explicit =
-        "uniform sampler2D Texture;\n"
-        "in vec2 Frag_UV;\n"
-        "in vec4 Frag_Color;\n"
-        "out vec4 Out_Color_0;\n"
-        "void main()\n"
-        "{\n"
-        "   vec4 tex_col4 = texture(Texture, Frag_UV.st);\n"
-        "   vec3 s1 = sqrt(tex_col4.xyz);\n"
-        "   vec3 s2 = sqrt(s1);\n"
-        "   vec3 s3 = sqrt(s2);\n"
-        "   Out_Color_0 = (vec4)(0.662002687f * S1 + 0.684122060f * S2 - 0.323583601f * S3 - 0.0225411470f * tex_col4.xyz, tex_col4.w);\n"
-        "}\n";
-
-static const char* fragment_shader_implicit =
-        "uniform sampler2D Texture;\n"
-        "in vec2 Frag_UV;\n"
-        "in vec4 Frag_Color;\n"
-        "out vec4 Out_Color_0;\n"
-        "void main()\n"
-        "{\n"
-        "   vec4 tex_col4 = texture(Texture, Frag_UV.st);\n"
-        "   Out_Color_0 = tex_col4;\n"
-        "}\n";
-
-void render_window::display()
-{
-    assert(rctx.window);
+    assert(ctx.window);
 
     if(clctx)
     {
@@ -422,11 +367,11 @@ void render_window::display()
 
     vec2i dim = get_window_size();
 
-    glfwMakeContextCurrent(rctx.window);
+    glfwMakeContextCurrent(ctx.window);
 
     glViewport(0, 0, dim.x(), dim.y());
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo);
+    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, ctx.fbo);
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -445,13 +390,13 @@ void render_window::display()
     {
         glEnable(GL_FRAMEBUFFER_SRGB);
 
-        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, rctx.fbo_srgb);
-        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
+        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, ctx.fbo_srgb);
+        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, ctx.fbo);
 
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
-        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo_srgb);
+        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, ctx.fbo_srgb);
 
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
@@ -460,21 +405,21 @@ void render_window::display()
     else
     {
         glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
-        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, rctx.fbo);
+        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, ctx.fbo);
 
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
 
     glFinish();
-    glfwSwapBuffers(rctx.window);
+    glfwSwapBuffers(ctx.window);
 }
 
-bool render_window::should_close()
+bool glfw_backend::should_close()
 {
     return closing;
 }
 
-void render_window::close()
+void glfw_backend::close()
 {
     closing = true;
 }

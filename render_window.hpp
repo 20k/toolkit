@@ -39,7 +39,7 @@ struct frostable
     vec2i dim;
 };
 
-struct render_context
+struct glfw_render_context
 {
     unsigned int fbo;
     unsigned int screen_tex;
@@ -50,7 +50,10 @@ struct render_context
     GLFWwindow* window = nullptr;
     ImFontAtlas atlas = {};
 
-    render_context(const render_settings& sett, const std::string& window_title);
+    glfw_render_context(const render_settings& sett, const std::string& window_title);
+    ~glfw_render_context();
+
+    void init_screen(vec2i dim);
 };
 
 struct opencl_context
@@ -63,9 +66,48 @@ struct opencl_context
     opencl_context();
 };
 
+struct generic_backend
+{
+    //virtual void set_srgb(bool enabled){}
+    virtual void poll(double maximum_sleep_s = 0){}
+    virtual void display(){}
+    virtual bool should_close(){return true;}
+    virtual void close(){}
+    virtual void init_screen(vec2i dim){}
+    virtual opencl_context* get_opencl_context(){return nullptr;}
+    virtual vec2i get_window_size(){return {0,0};}
+    virtual vec2i get_window_position(){return {0,0};}
+
+    virtual ~generic_backend(){}
+};
+
+struct glfw_backend : generic_backend
+{
+    glfw_render_context ctx;
+    opencl_context* clctx = nullptr;
+
+    glfw_backend(const render_settings& sett, const std::string& window_title);
+
+    //void set_srgb(bool enabled) override;
+    void poll(double maximum_sleep_s = 0) override;
+    void display() override;
+    bool should_close() override;
+    void close() override;
+    void init_screen(vec2i dim) override;
+    opencl_context* get_opencl_context() override;
+    vec2i get_window_size() override;
+    vec2i get_window_position() override;
+
+    ~glfw_backend();
+
+private:
+    bool closing = false;
+    vec2i last_size;
+};
+
 struct render_window
 {
-    render_context rctx;
+    generic_backend* backend = nullptr;
     opencl_context* clctx = nullptr;
 
     render_window(const render_settings& sett, const std::string& window_title);
@@ -73,25 +115,23 @@ struct render_window
 
     render_settings get_render_settings();
 
-    vec2i get_window_size();
-    vec2i get_window_position();
+    vec2i get_window_size(){return backend->get_window_size();}
+    vec2i get_window_position(){return backend->get_window_position();}
 
     void set_srgb(bool enabled);
 
-    void poll(double maximum_sleep_s = 0);
+    void poll(double maximum_sleep_s = 0){return backend->poll(maximum_sleep_s);}
 
     std::vector<frostable> get_frostables();
 
-    void display();
-    bool should_close();
-    void close();
+    void display(){return backend->display();}
+    bool should_close(){return backend->should_close();}
+    void close(){return backend->close();}
 
     void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
     void render_texture(unsigned int handle, vec2f p_min, vec2f p_max);
 
 private:
-    bool closing = false;
-    vec2i last_size;
     render_settings settings;
 };
 
