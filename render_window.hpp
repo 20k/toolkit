@@ -5,6 +5,7 @@
 #include <imgui/imgui.h>
 #include "opencl.hpp"
 #include <networking/serialisable_fwd.hpp>
+#include <SFML/System.hpp>
 
 struct GLFWwindow;
 struct texture;
@@ -75,7 +76,7 @@ struct generic_backend
     virtual void close(){}
     virtual void init_screen(vec2i dim){}
     virtual opencl_context* get_opencl_context(){return nullptr;}
-    virtual vec2i get_window_size(){return {0,0};}
+    virtual vec2i get_window_size(){return {ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y};}
     virtual vec2i get_window_position(){return {0,0};}
 
     virtual ~generic_backend(){}
@@ -87,6 +88,7 @@ struct glfw_backend : generic_backend
     opencl_context* clctx = nullptr;
 
     glfw_backend(const render_settings& sett, const std::string& window_title);
+    ~glfw_backend();
 
     //void set_srgb(bool enabled) override;
     void poll(double maximum_sleep_s = 0) override;
@@ -98,12 +100,40 @@ struct glfw_backend : generic_backend
     vec2i get_window_size() override;
     vec2i get_window_position() override;
 
-    ~glfw_backend();
-
 private:
     bool closing = false;
     vec2i last_size;
 };
+
+#ifdef USE_IMTUI
+struct VSync;
+
+namespace ImTui
+{
+    struct TScreen;
+}
+
+struct imtui_backend : generic_backend
+{
+    ImTui::TScreen* screen = nullptr;
+    sf::Clock clk;
+
+    imtui_backend(const render_settings& sett, const std::string& window_title);
+    ~imtui_backend();
+
+    void poll(double maximum_sleep_s = 0) override;
+    void display() override;
+    bool should_close() override;
+    void close() override;
+    //void init_screen(vec2i dim) override;
+    //opencl_context* get_opencl_context() override;
+    //vec2i get_window_size() override;
+    //vec2i get_window_position() override;
+
+private:
+    bool closing = false;
+};
+#endif // USE_IMTUI
 
 struct render_window
 {

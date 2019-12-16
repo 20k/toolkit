@@ -11,6 +11,11 @@
 #include <map>
 #include <iostream>
 
+#ifdef USE_IMTUI
+#include <imtui/imtui.h>
+#include <imtui/imtui-impl-ncurses.h>
+#endif // USE_IMTUI
+
 namespace
 {
     thread_local std::map<std::string, bool> frost_map;
@@ -326,6 +331,86 @@ void glfw_backend::close()
 {
     closing = true;
 }
+
+#ifdef USE_IMTUI
+imtui_backend::imtui_backend(const render_settings& sett, const std::string& window_title)
+{
+    screen = new ImTui::TScreen;
+
+    ImGui::CreateContext();
+
+    printf("ImGui create context\n");
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    /*
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+    if(sett.viewports)
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+    ImGuiStyle& style = ImGui::GetStyle();
+
+    style.FrameRounding = 0;
+    style.WindowRounding = 0;
+    style.ChildRounding = 0;
+    style.ChildBorderSize = 0;
+    style.FrameBorderSize = 0;
+    style.WindowBorderSize = 1;
+
+    if(io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
+
+    if(sett.is_srgb)
+        ImGui::SetStyleLinearColor(true);*/
+
+    io.Fonts->Clear();
+    io.Fonts->AddFontDefault();
+    /*ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1)*/
+
+    ImTui_ImplNcurses_Init(true);
+    ImTui_ImplText_Init();
+}
+
+imtui_backend::~imtui_backend()
+{
+    ImTui_ImplText_Shutdown();
+    ImTui_ImplNcurses_Shutdown();
+    ImGui::DestroyContext();
+}
+
+void imtui_backend::poll(double maximum_sleep_s)
+{
+    ImTui_ImplNcurses_NewFrame(*screen);
+    ImTui_ImplText_NewFrame();
+
+    ImGui::GetIO().DeltaTime = clk.restart().asMicroseconds() / 1000. / 1000.;
+
+    ImGui::NewFrame();
+}
+
+void imtui_backend::display()
+{
+    ImGui::Render();
+
+    ImTui_ImplText_RenderDrawData(ImGui::GetDrawData(), *screen);
+    ImTui_ImplNcurses_DrawScreen(*screen);
+}
+
+bool imtui_backend::should_close()
+{
+    return closing;
+}
+
+void imtui_backend::close()
+{
+    closing = true;
+}
+
+#endif // USE_IMTUI
 
 opencl_context* glfw_backend::get_opencl_context()
 {
