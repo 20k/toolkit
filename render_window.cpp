@@ -147,51 +147,6 @@ glfw_backend::~glfw_backend()
     }
 }
 
-opencl_context* glfw_backend::get_opencl_context()
-{
-    return clctx;
-}
-
-opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
-{
-
-}
-
-render_window::render_window(const render_settings& sett, const std::string& window_title)
-{
-    backend = new glfw_backend(sett, window_title);
-
-    settings = sett;
-
-    if(sett.opencl && backend->get_opencl_context())
-    {
-        clctx = backend->get_opencl_context();
-    }
-
-    backend->init_screen({sett.width, sett.height});
-}
-
-render_window::~render_window()
-{
-    if(backend)
-    {
-        delete backend;
-        backend = nullptr;
-    }
-}
-
-render_settings render_window::get_render_settings()
-{
-    render_settings sett = settings;
-
-    auto dim = get_window_size();
-
-    sett.width = dim.x();
-    sett.height = dim.y();
-
-    return sett;
-}
-
 vec2i glfw_backend::get_window_size()
 {
     assert(ctx.window);
@@ -216,21 +171,30 @@ vec2i glfw_backend::get_window_position()
     return {wxpos, wypos};
 }
 
-void render_window::set_srgb(bool enabled)
+void glfw_backend::poll(double maximum_sleep_s)
 {
-    if(enabled == settings.is_srgb)
-        return;
+    assert(ctx.window);
 
-    settings.is_srgb = enabled;
+    glfwWaitEventsTimeout(maximum_sleep_s);
 
-    ImGui::SetStyleLinearColor(settings.is_srgb);
-}
+    if(glfwWindowShouldClose(ctx.window))
+        closing = true;
 
-void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
-{
-    render_window* win = (render_window*)cmd->UserCallbackData;
+    auto next_size = get_window_size();
 
-    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
+    if(next_size != last_size)
+    {
+        last_size = next_size;
+
+        init_screen(next_size);
+    }
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    //ImDrawList* draw = ImGui::GetBackgroundDrawList();
+    //draw->AddCallback(pre_render, this);
 }
 
 ///just realised a much faster version of this
@@ -291,70 +255,6 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     assert(win->clctx);
 
     blur_buffer(*win, win->clctx->cl_screen_tex);
-}
-
-void glfw_backend::poll(double maximum_sleep_s)
-{
-    assert(ctx.window);
-
-    glfwWaitEventsTimeout(maximum_sleep_s);
-
-    if(glfwWindowShouldClose(ctx.window))
-        closing = true;
-
-    auto next_size = get_window_size();
-
-    if(next_size != last_size)
-    {
-        last_size = next_size;
-
-        init_screen(next_size);
-    }
-
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    //ImDrawList* draw = ImGui::GetBackgroundDrawList();
-    //draw->AddCallback(pre_render, this);
-}
-
-std::vector<frostable> render_window::get_frostables()
-{
-    ImGuiContext& g = *GImGui;
-
-    std::vector<frostable> frosts;
-
-    for(int i = 0; i != g.Windows.Size; i++)
-    {
-        ImGuiWindow* window = g.Windows[i];
-        if(window->Active && (window->Flags & (ImGuiWindowFlags_ChildWindow)) == 0)
-        {
-            std::string name = std::string(window->Name);
-
-            auto it = frost_map.find(name);
-
-            if(it == frost_map.end() || it->second == false)
-                continue;
-
-            auto pos = window->Pos;
-            ImVec2 dim = window->Size;
-
-            if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-            {
-                pos.x -= ImGui::GetMainViewport()->Pos.x;
-                pos.y -= ImGui::GetMainViewport()->Pos.y;
-            }
-
-            frostable f;
-            f.pos = {pos.x, pos.y};
-            f.dim = {dim.x, dim.y};
-
-            frosts.push_back(f);
-        }
-    }
-
-    return frosts;
 }
 
 void glfw_backend::display()
@@ -425,6 +325,106 @@ bool glfw_backend::should_close()
 void glfw_backend::close()
 {
     closing = true;
+}
+
+opencl_context* glfw_backend::get_opencl_context()
+{
+    return clctx;
+}
+
+opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+{
+
+}
+
+render_window::render_window(const render_settings& sett, const std::string& window_title)
+{
+    backend = new glfw_backend(sett, window_title);
+
+    settings = sett;
+
+    if(sett.opencl && backend->get_opencl_context())
+    {
+        clctx = backend->get_opencl_context();
+    }
+
+    backend->init_screen({sett.width, sett.height});
+}
+
+render_window::~render_window()
+{
+    if(backend)
+    {
+        delete backend;
+        backend = nullptr;
+    }
+}
+
+render_settings render_window::get_render_settings()
+{
+    render_settings sett = settings;
+
+    auto dim = get_window_size();
+
+    sett.width = dim.x();
+    sett.height = dim.y();
+
+    return sett;
+}
+
+void render_window::set_srgb(bool enabled)
+{
+    if(enabled == settings.is_srgb)
+        return;
+
+    settings.is_srgb = enabled;
+
+    ImGui::SetStyleLinearColor(settings.is_srgb);
+}
+
+void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
+{
+    render_window* win = (render_window*)cmd->UserCallbackData;
+
+    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
+}
+
+std::vector<frostable> render_window::get_frostables()
+{
+    ImGuiContext& g = *GImGui;
+
+    std::vector<frostable> frosts;
+
+    for(int i = 0; i != g.Windows.Size; i++)
+    {
+        ImGuiWindow* window = g.Windows[i];
+        if(window->Active && (window->Flags & (ImGuiWindowFlags_ChildWindow)) == 0)
+        {
+            std::string name = std::string(window->Name);
+
+            auto it = frost_map.find(name);
+
+            if(it == frost_map.end() || it->second == false)
+                continue;
+
+            auto pos = window->Pos;
+            ImVec2 dim = window->Size;
+
+            if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            {
+                pos.x -= ImGui::GetMainViewport()->Pos.x;
+                pos.y -= ImGui::GetMainViewport()->Pos.y;
+            }
+
+            frostable f;
+            f.pos = {pos.x, pos.y};
+            f.dim = {dim.x, dim.y};
+
+            frosts.push_back(f);
+        }
+    }
+
+    return frosts;
 }
 
 void render_window::render(const std::vector<vertex>& vertices, texture* tex)
