@@ -125,9 +125,7 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
 
-    #ifndef __EMSCRIPTEN__
     ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1);
-    #endif // __EMSCRIPTEN__
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -482,6 +480,7 @@ render_window::render_window(render_settings sett, const std::string& window_tit
 
     sett.width = width;
     sett.height = height;
+    sett.viewports = false;
     #endif // __EMSCRIPTEN__
 
     if(type == backend_type::GLFW)
