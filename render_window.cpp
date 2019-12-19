@@ -285,7 +285,7 @@ void glfw_backend::display()
 
     glViewport(0, 0, dim.x(), dim.y());
 
-    glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, ctx.fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx.fbo);
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -304,13 +304,13 @@ void glfw_backend::display()
     {
         glEnable(GL_FRAMEBUFFER_SRGB);
 
-        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, ctx.fbo_srgb);
-        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, ctx.fbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx.fbo_srgb);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx.fbo);
 
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
-        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, ctx.fbo_srgb);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx.fbo_srgb);
 
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
@@ -318,8 +318,8 @@ void glfw_backend::display()
     }
     else
     {
-        glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, 0);
-        glBindFramebufferEXT(GL_READ_FRAMEBUFFER, ctx.fbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx.fbo);
 
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
