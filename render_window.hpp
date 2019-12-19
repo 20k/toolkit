@@ -1,9 +1,16 @@
 #ifndef RENDER_WINDOW_HPP_INCLUDED
 #define RENDER_WINDOW_HPP_INCLUDED
 
+#ifdef __EMSCRIPTEN__
+#define NO_OPENCL
+#endif // __EMSCRIPTEN__
+
+#ifndef NO_OPENCL
+#include "opencl.hpp"
+#endif // NO_OPENCL
+
 #include <vec/vec.hpp>
 #include <imgui/imgui.h>
-#include "opencl.hpp"
 #include <networking/serialisable_fwd.hpp>
 #include <SFML/System.hpp>
 
