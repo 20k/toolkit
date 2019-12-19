@@ -99,6 +99,7 @@ struct generic_backend
     virtual opencl_context* get_opencl_context(){return nullptr;}
     virtual vec2i get_window_size(){return {ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y};}
     virtual vec2i get_window_position(){return {0,0};}
+    virtual void resize(vec2i dim){}
 
     virtual ~generic_backend(){}
 };
@@ -120,10 +121,11 @@ struct glfw_backend : generic_backend
     opencl_context* get_opencl_context() override;
     vec2i get_window_size() override;
     vec2i get_window_position() override;
+    void resize(vec2i dim) override;
 
+    vec2i last_size;
 private:
     bool closing = false;
-    vec2i last_size;
 };
 
 #ifdef USE_IMTUI
@@ -161,7 +163,7 @@ struct render_window
     generic_backend* backend = nullptr;
     opencl_context* clctx = nullptr;
 
-    render_window(const render_settings& sett, const std::string& window_title, backend_type::type type = backend_type::GLFW);
+    render_window(render_settings sett, const std::string& window_title, backend_type::type type = backend_type::GLFW);
     ~render_window();
 
     render_settings get_render_settings();
@@ -178,6 +180,7 @@ struct render_window
     void display(){return backend->display();}
     bool should_close(){return backend->should_close();}
     void close(){return backend->close();}
+    void resize(vec2i dim){return backend->resize(dim);}
 
     void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
     void render_texture(unsigned int handle, vec2f p_min, vec2f p_max);

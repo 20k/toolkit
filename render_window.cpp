@@ -16,6 +16,12 @@
 #include <imtui/imtui-impl-ncurses.h>
 #endif // USE_IMTUI
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#include <emscripten/html5.h>
+#endif // __EMSCRIPTEN__
+
+
 namespace
 {
     thread_local std::map<std::string, bool> frost_map;
@@ -37,10 +43,14 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
     glGenTextures(1, tex);
     glBindTexture(GL_TEXTURE_2D, *tex);
 
+    #ifndef __EMSCRIPTEN__
     if(!is_srgb)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
     else
         glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, wx, wy, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    #else
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    #endif
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -55,7 +65,11 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
     if(!glfwInit())
         throw std::runtime_error("Could not init glfw");
 
+    #ifndef __EMSCRIPTEN__
     const char* glsl_version = "#version 130";
+    #else
+    const char* glsl_version = "#version 100";
+    #endif
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 
@@ -110,7 +124,10 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
 
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
+
+    #ifndef __EMSCRIPTEN__
     ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1);
+    #endif // __EMSCRIPTEN__
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -126,9 +143,26 @@ glfw_render_context::~glfw_render_context()
     glfwTerminate();
 }
 
+
+#ifdef __EMSCRIPTEN__
+EM_BOOL on_emscripten_resize(int eventType, const EmscriptenUiEvent *uiEvent, void *userData)
+{
+    if(eventType == EMSCRIPTEN_EVENT_RESIZE)
+    {
+        glfw_backend& b = *(glfw_backend*)userData;
+
+        vec2i dim = {uiEvent->windowInnerWidth, uiEvent->windowInnerHeight};
+
+        b.resize(dim);
+    }
+}
+#endif // __EMSCRIPTEN__
+
 glfw_backend::glfw_backend(const render_settings& sett, const std::string& window_title) : ctx(sett, window_title)
 {
-
+    #ifdef __EMSCRIPTEN__
+    emscripten_set_resize_callback(nullptr, (void*)this, false, on_emscripten_resize);
+    #endif // __EMSCRIPTEN__
 }
 
 void glfw_backend::init_screen(vec2i dim)
@@ -191,9 +225,7 @@ void glfw_backend::poll(double maximum_sleep_s)
 
     if(next_size != last_size)
     {
-        last_size = next_size;
-
-        init_screen(next_size);
+        resize(next_size);
     }
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -338,6 +370,17 @@ void glfw_backend::close()
     closing = true;
 }
 
+void glfw_backend::resize(vec2i dim)
+{
+    if(dim == last_size)
+        return;
+
+    last_size = dim;
+
+    glfwSetWindowSize(ctx.window, last_size.x(), last_size.y());
+    init_screen(dim);
+}
+
 #ifdef USE_IMTUI
 imtui_backend::imtui_backend(const render_settings& sett, const std::string& window_title)
 {
@@ -430,8 +473,17 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 }
 #endif // NO_OPENCL
 
-render_window::render_window(const render_settings& sett, const std::string& window_title, backend_type::type type)
+render_window::render_window(render_settings sett, const std::string& window_title, backend_type::type type)
 {
+    #ifdef __EMSCRIPTEN__
+    double width, height;
+    emscripten_get_element_css_size("canvas", &width, &height);
+    emscripten_set_canvas_size(int(width), int(height));
+
+    sett.width = width;
+    sett.height = height;
+    #endif // __EMSCRIPTEN__
+
     if(type == backend_type::GLFW)
         backend = new glfw_backend(sett, window_title);
 
