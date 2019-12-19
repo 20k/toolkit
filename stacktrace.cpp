@@ -1,4 +1,7 @@
 #include "stacktrace.hpp"
+#include "config.hpp"
+
+#ifndef NO_STACKTRACE
 
 #define BOOST_STACKTRACE_USE_BACKTRACE
 
@@ -80,3 +83,9 @@ struct static_helper
 };
 
 static static_helper help;
+#else
+std::string get_stacktrace()
+{
+    return "Stacktracing unimplemented on this platform, emscripten?";
+}
+#endif

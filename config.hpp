@@ -1,0 +1,9 @@
+#ifndef CONFIG_HPP_INCLUDED
+#define CONFIG_HPP_INCLUDED
+
+#ifdef __EMSCRIPTEN__
+#define NO_OPENCL
+#define NO_STACKTRACE
+#endif // __EMSCRIPTEN__
+
+#endif // CONFIG_HPP_INCLUDED

@@ -1,9 +1,7 @@
 #ifndef RENDER_WINDOW_HPP_INCLUDED
 #define RENDER_WINDOW_HPP_INCLUDED
 
-#ifdef __EMSCRIPTEN__
-#define NO_OPENCL
-#endif // __EMSCRIPTEN__
+#include "config.hpp"
 
 #ifndef NO_OPENCL
 #include "opencl.hpp"
@@ -12,7 +10,7 @@
 #include <vec/vec.hpp>
 #include <imgui/imgui.h>
 #include <networking/serialisable_fwd.hpp>
-#include <SFML/System.hpp>
+#include "clock.hpp"
 
 struct GLFWwindow;
 struct texture;
@@ -73,6 +71,12 @@ struct glfw_render_context
     void init_screen(vec2i dim);
 };
 
+#ifdef NO_OPENCL
+struct opencl_context
+{
+
+};
+#else
 struct opencl_context
 {
     cl::context ctx;
@@ -82,6 +86,7 @@ struct opencl_context
 
     opencl_context();
 };
+#endif // NO_OPENCL
 
 struct generic_backend
 {
@@ -132,7 +137,7 @@ namespace ImTui
 struct imtui_backend : generic_backend
 {
     ImTui::TScreen* screen = nullptr;
-    sf::Clock clk;
+    steady_timer clk;
 
     imtui_backend(const render_settings& sett, const std::string& window_title);
     ~imtui_backend();

@@ -136,11 +136,13 @@ void glfw_backend::init_screen(vec2i dim)
     make_fbo(&ctx.fbo, &ctx.screen_tex, dim, false);
     make_fbo(&ctx.fbo_srgb, &ctx.screen_tex_srgb, dim, true);
 
+    #ifndef NO_OPENCL
     if(clctx)
     {
         clctx->cl_screen_tex.create_from_texture(ctx.screen_tex);
         clctx->cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
     }
+    #endif // NO_OPENCL
 }
 
 glfw_backend::~glfw_backend()
@@ -204,6 +206,7 @@ void glfw_backend::poll(double maximum_sleep_s)
 
 ///just realised a much faster version of this
 ///unconditionally blur whole screen, then only clip bits we want
+#ifndef NO_OPENCL
 void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 {
     std::vector<frostable> frosty = win.get_frostables();
@@ -252,6 +255,7 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
     tex.unacquire(win.clctx->cqueue);
     win.clctx->cqueue.block();
 }
+#endif // NO_OPENCL
 
 void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 {
@@ -259,7 +263,9 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 
     assert(win->clctx);
 
+    #ifndef NO_OPENCL
     blur_buffer(*win, win->clctx->cl_screen_tex);
+    #endif // NO_OPENCL
 }
 
 void glfw_backend::display()
@@ -387,7 +393,7 @@ void imtui_backend::poll(double maximum_sleep_s)
     ImTui_ImplNcurses_NewFrame(*screen);
     ImTui_ImplText_NewFrame();
 
-    ImGui::GetIO().DeltaTime = clk.restart().asMicroseconds() / 1000. / 1000.;
+    ImGui::GetIO().DeltaTime = clk.restart();
 
     ImGui::NewFrame();
 }
@@ -417,10 +423,12 @@ opencl_context* glfw_backend::get_opencl_context()
     return clctx;
 }
 
+#ifndef NO_OPENCL
 opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
 {
 
 }
+#endif // NO_OPENCL
 
 render_window::render_window(const render_settings& sett, const std::string& window_title, backend_type::type type)
 {

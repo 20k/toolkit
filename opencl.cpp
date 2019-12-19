@@ -1,3 +1,7 @@
+#include "config.hpp"
+
+#ifndef NO_OPENCL
+
 #include <GL/glew.h>
 #include "opencl.hpp"
 #include <stdexcept>
@@ -614,3 +618,5 @@ void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
         throw std::runtime_error("Could not copy buffers");
     }
 }
+
+#endif // NO_OPENCL
