@@ -481,6 +481,7 @@ render_window::render_window(render_settings sett, const std::string& window_tit
     sett.width = width;
     sett.height = height;
     sett.viewports = false;
+    sett.is_srgb = false;
     #endif // __EMSCRIPTEN__
 
     if(type == backend_type::GLFW)
