@@ -4,6 +4,7 @@
 #ifdef __EMSCRIPTEN__
 #define NO_OPENCL
 #define NO_STACKTRACE
+#define NO_STEAM
 #endif // __EMSCRIPTEN__
 
 #endif // CONFIG_HPP_INCLUDED
