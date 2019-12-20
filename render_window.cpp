@@ -141,7 +141,6 @@ glfw_render_context::~glfw_render_context()
     glfwTerminate();
 }
 
-
 #ifdef __EMSCRIPTEN__
 EM_BOOL on_emscripten_resize(int eventType, const EmscriptenUiEvent *uiEvent, void *userData)
 {
