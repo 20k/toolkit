@@ -371,7 +371,6 @@ void glfw_backend::display()
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
 
-    glFinish();
     glfwSwapBuffers(ctx.window);
 }
 
@@ -407,7 +406,6 @@ void glfw_backend::display_last_frame()
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
 
-    glFinish();
     glfwSwapBuffers(ctx.window);
 }
 
