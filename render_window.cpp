@@ -230,6 +230,17 @@ void glfw_backend::poll(double maximum_sleep_s)
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    #ifdef __EMSCRIPTEN__
+    ImGuiIO& io = ImGui::GetIO();
+
+    ///workaround for emscripten scrolling bugs
+    io.MouseWheelH /= 100.f;
+    io.MouseWheel /= 100.f;
+
+    io.MouseWheelH = -io.MouseWheelH; //?
+    io.MouseWheel = -io.MouseWheel;
+    #endif // __EMSCRIPTEN__
+
     //ImDrawList* draw = ImGui::GetBackgroundDrawList();
     //draw->AddCallback(pre_render, this);
 }
