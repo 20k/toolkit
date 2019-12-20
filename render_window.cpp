@@ -209,7 +209,7 @@ vec2i glfw_backend::get_window_position()
     return {wxpos, wypos};
 }
 
-void glfw_backend::poll(double maximum_sleep_s)
+void glfw_backend::poll_events_only(double maximum_sleep_s)
 {
     assert(ctx.window);
 
@@ -227,7 +227,6 @@ void glfw_backend::poll(double maximum_sleep_s)
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
 
     #ifdef __EMSCRIPTEN__
     ImGuiIO& io = ImGui::GetIO();
@@ -239,9 +238,17 @@ void glfw_backend::poll(double maximum_sleep_s)
     io.MouseWheelH = -io.MouseWheelH; //?
     io.MouseWheel = -io.MouseWheel;
     #endif // __EMSCRIPTEN__
+}
 
-    //ImDrawList* draw = ImGui::GetBackgroundDrawList();
-    //draw->AddCallback(pre_render, this);
+void glfw_backend::poll_issue_new_frame_only()
+{
+    ImGui::NewFrame();
+}
+
+void glfw_backend::poll(double maximum_sleep_s)
+{
+    poll_events_only(maximum_sleep_s);
+    poll_issue_new_frame_only();
 }
 
 ///just realised a much faster version of this
@@ -348,6 +355,42 @@ void glfw_backend::display()
         glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx.fbo);
 
         glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx.fbo_srgb);
+
+        glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+        glDisable(GL_FRAMEBUFFER_SRGB);
+    }
+    else
+    {
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx.fbo);
+
+        glBlitFramebuffer(0, 0, dim.x(), dim.y(), 0, 0, dim.x(), dim.y(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
+
+    glFinish();
+    glfwSwapBuffers(ctx.window);
+}
+
+void glfw_backend::display_last_frame()
+{
+    assert(ctx.window);
+
+    if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        throw std::runtime_error("Can't do this with viewports");
+    }
+
+    vec2i dim = get_window_size();
+
+    glfwMakeContextCurrent(ctx.window);
+
+    if(ImGui::GetCurrentContext()->IsLinearColor)
+    {
+        glEnable(GL_FRAMEBUFFER_SRGB);
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, ctx.fbo_srgb);

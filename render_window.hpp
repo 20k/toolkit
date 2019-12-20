@@ -92,7 +92,10 @@ struct generic_backend
 {
     //virtual void set_srgb(bool enabled){}
     virtual void poll(double maximum_sleep_s = 0){}
+    virtual void poll_events_only(double maximum_sleep_s = 0){}
+    virtual void poll_issue_new_frame_only(){}
     virtual void display(){}
+    virtual void display_last_frame(){}
     virtual bool should_close(){return true;}
     virtual void close(){}
     virtual void init_screen(vec2i dim){}
@@ -114,7 +117,10 @@ struct glfw_backend : generic_backend
 
     //void set_srgb(bool enabled) override;
     void poll(double maximum_sleep_s = 0) override;
+    void poll_events_only(double maximum_sleep_s = 0) override;
+    void poll_issue_new_frame_only() override;
     void display() override;
+    void display_last_frame() override;
     bool should_close() override;
     void close() override;
     void init_screen(vec2i dim) override;
@@ -174,9 +180,12 @@ struct render_window
     void set_srgb(bool enabled);
 
     void poll(double maximum_sleep_s = 0){return backend->poll(maximum_sleep_s);}
+    void poll_events_only(double maximum_sleep_s = 0) {return backend->poll_events_only(maximum_sleep_s);}
+    void poll_issue_new_frame_only() {return backend->poll_issue_new_frame_only();}
 
     std::vector<frostable> get_frostables();
 
+    void display_last_frame(){return backend->display_last_frame();}
     void display(){return backend->display();}
     bool should_close(){return backend->should_close();}
     void close(){return backend->close();}
