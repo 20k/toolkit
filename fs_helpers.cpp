@@ -214,7 +214,7 @@ struct em_helper
 
         while(emscripten_run_script_int("Module.syncdone") == 0)
         {
-            emscripten_sleep(1000);
+            emscripten_sleep(100);
         }
 
         printf("Finished mounting\n");
