@@ -551,6 +551,10 @@ render_window::render_window(render_settings sett, const std::string& window_tit
     }
 
     backend->init_screen({sett.width, sett.height});
+
+    #ifdef __EMSCRIPTEN__
+    ImGui::GetIO().IniFilename = "web/imgui.ini";
+    #endif // __EMSCRIPTEN__
 }
 
 render_window::~render_window()
