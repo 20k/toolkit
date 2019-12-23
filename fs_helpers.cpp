@@ -3,6 +3,11 @@
 #include <fstream>
 #include "clock.hpp"
 
+#include <string>
+#include <vector>
+#include <sstream>
+#include <fstream>
+
 #ifdef __WIN32__
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -12,6 +17,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #endif // __WIN32__
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif // __EMSCRIPTEN__
 
 std::string file::read(const std::string& file)
 {
@@ -70,7 +79,7 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
 
     while(written < data.size())
     {
-        int rval = write(fd, &data[written], (int)data.size() - written);
+        int rval = ::write(fd, &data[written], (int)data.size() - written);
 
         if(rval == -1)
         {
@@ -87,7 +96,7 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
 
     if(!file::exists(file))
     {
-        rename(atomic_file.c_str(), file.c_str());
+        ::rename(atomic_file.c_str(), file.c_str());
         return;
     }
 
@@ -101,7 +110,7 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
         #ifdef __WIN32__
         bool err = ReplaceFileA(file.c_str(), atomic_file.c_str(), backup_file.c_str(), REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr) == 0;
         #else
-        bool err = rename(atomic_file.c_str(), file.c_str()) != 0;
+        bool err = ::rename(atomic_file.c_str(), file.c_str()) != 0;
         #endif // __WIN32__
 
         //bool err = ReplaceFileA(file.c_str(), atomic_file.c_str(), nullptr, REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr) == 0;
@@ -146,18 +155,27 @@ bool file::exists(const std::string& name)
     return f.good();
 }
 
+void file::rename(const std::string& from, const std::string& to)
+{
+    #ifndef __EMSCRIPTEN__
+    ::rename(from.c_str(), to.c_str());
+    #else
+    ::rename(("web/" + from).c_str(), ("web/" + to).c_str());
+    #endif
+}
+
 #ifdef __EMSCRIPTEN__
+EM_JS(void, handle_mounting, (),
+{
+    FS.mkdir('/web');
+    FS.mount(IDBFS, {}, "/web");
+});
+
 struct em_helper
 {
     em_helper()
     {
-        #ifdef __EMSCRIPTEN__
-        EM_ASM(void, handle_mounting, (),
-        {
-            FS.mkdir('/web');
-            FS.mount(IDBFS, {}, "/web");
-        });
-        #endif // __EMSCRIPTEN__
+       handle_mounting();
     }
 };
 
@@ -165,5 +183,4 @@ namespace
 {
     em_helper help;
 }
-
 #endif
