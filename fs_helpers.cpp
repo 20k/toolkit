@@ -22,6 +22,22 @@
 #include <emscripten.h>
 #endif // __EMSCRIPTEN__
 
+#ifdef __EMSCRIPTEN__
+EM_JS(void, syncer, (),
+{
+    FS.syncfs(false, function (err) {
+
+    });
+});
+#endif // __EMSCRIPTEN__
+
+void sync_writes()
+{
+    #ifdef __EMSCRIPTEN__
+    syncer();
+    #endif // __EMSCRIPTEN__
+}
+
 std::string file::read(const std::string& file)
 {
     #ifndef __EMSCRIPTEN__
@@ -44,12 +60,16 @@ std::string file::read(const std::string& file)
 
 void file::write(const std::string& file, const std::string& data)
 {
-    #ifndef __EMSCRIPTEN__
-    std::ofstream out(file, std::ios::binary);
-    #else
-    std::ofstream out("web/" + file, std::ios::binary);
-    #endif
-    out << data;
+    {
+        #ifndef __EMSCRIPTEN__
+        std::ofstream out(file, std::ios::binary);
+        #else
+        std::ofstream out("web/" + file, std::ios::binary);
+        #endif
+        out << data;
+    }
+
+    sync_writes();
 }
 
 void file::write_atomic(const std::string& in_file, const std::string& data)
@@ -94,9 +114,12 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
 
     #endif // __WIN32__
 
+    sync_writes();
+
     if(!file::exists(file))
     {
         ::rename(atomic_file.c_str(), file.c_str());
+        sync_writes();
         return;
     }
 
@@ -131,6 +154,8 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
 
             any_errors = true;
         }
+
+        sync_writes();
     }
     while(timer.get_elapsed_time_s() < 1);
 
@@ -162,6 +187,8 @@ void file::rename(const std::string& from, const std::string& to)
     #else
     ::rename(("web/" + from).c_str(), ("web/" + to).c_str());
     #endif
+
+    sync_writes(); //?
 }
 
 #ifdef __EMSCRIPTEN__
@@ -169,18 +196,27 @@ EM_JS(void, handle_mounting, (),
 {
     FS.mkdir('/web');
     FS.mount(IDBFS, {}, "/web");
+
+    Module.syncdone = 0;
+
+    FS.syncfs(true, function (err) {
+        Module.syncdone = 1;
+    });
 });
 
 struct em_helper
 {
     em_helper()
     {
-       handle_mounting();
+        handle_mounting();
+
+        while(emscripten_run_script_int("Module.syncdone") == 0)
+        {
+            emscripten_sleep(1000);
+        }
     }
 };
 
-namespace
-{
-    em_helper help;
-}
+static em_helper help;
+
 #endif
