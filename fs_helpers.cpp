@@ -210,13 +210,22 @@ struct em_helper
     {
         handle_mounting();
 
+        printf("Mounted\n");
+
         while(emscripten_run_script_int("Module.syncdone") == 0)
         {
             emscripten_sleep(1000);
         }
+
+        printf("Finished mounting\n");
     }
 };
 
-static em_helper help;
-
 #endif
+
+void file::init()
+{
+    #ifdef __EMSCRIPTEN__
+    static em_helper help;
+    #endif // __EMSCRIPTEN__
+}

@@ -11,6 +11,8 @@ namespace file
     void write_atomic(const std::string& file, const std::string& data);
     bool exists(const std::string& name);
     void rename(const std::string& from, const std::string& to);
+
+    void init();
 }
 
 #endif // FS_HELPERS_HPP_INCLUDED
