@@ -12,6 +12,11 @@ namespace file
     bool exists(const std::string& name);
     void rename(const std::string& from, const std::string& to);
 
+    #ifdef __EMSCRIPTEN__
+    // EMSCRIPTEN ONLY OBVIOUSLY
+    void download(const std::string& name, const std::string& data);
+    #endif // __EMSCRIPTEN__
+
     void init();
 }
 

@@ -192,10 +192,67 @@ void file::rename(const std::string& from, const std::string& to)
 }
 
 #ifdef __EMSCRIPTEN__
+#if 0
+EM_JS(void, handle_download, (const char* fullname, const char* shortname),
+{
+    var memoryFSname = UTF8ToString(fullname);
+    var localFSname = UTF8ToString(shortname);
+
+    var data = FS.readFile(memoryFSname);
+
+    var blob;
+    var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if(isSafari) {
+        blob = new Blob([data.buffer], {type: "application/octet-stream"});
+    } else {
+        blob = new Blob([data.buffer], {type: "application/octet-binary"});
+    }
+    saveAs(blob, localFSname);
+});
+#endif // 0
+
+EM_JS(void, handle_download, (const char* fullname),
+{
+    var memoryFSname = UTF8ToString(fullname);
+
+    console.log(memoryFSname);
+
+    var content = FS.readFile(memoryFSname);
+    var mime = "application/octet-stream";
+
+    var a = document.createElement('a');
+    a.download = memoryFSname;
+    a.href = URL.createObjectURL(new Blob([content], {type: mime}));
+    a.style.display = 'none';
+
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    }, 2000);
+});
+
+void file::download(const std::string& name, const std::string& data)
+{
+    {
+        std::ofstream out("download/" + name, std::ios::binary);
+        out << data;
+    }
+
+    std::string full_path = "download/" + name;
+
+    handle_download(full_path.c_str());
+}
+#endif // __EMSCRIPTEN__
+
+#ifdef __EMSCRIPTEN__
 EM_JS(void, handle_mounting, (),
 {
     FS.mkdir('/web');
+    FS.mkdir('/download');
     FS.mount(IDBFS, {}, "/web");
+    FS.mount(MEMFS, {}, "/download");
 
     Module.syncdone = 0;
 
