@@ -285,6 +285,16 @@ EM_JS(void, drag_drop_init, (),
 });
 #endif // __EMSCRIPTEN__
 
+std::string fixup_string(std::string in)
+{
+    if(in.size() == 0)
+        return in;
+
+    int clen = strlen(in.c_str());
+
+    return std::string(in.begin(), in.begin() + clen);
+}
+
 void glfw_backend::poll_events_only(double maximum_sleep_s)
 {
     assert(ctx.window);
@@ -325,8 +335,8 @@ void glfw_backend::poll_events_only(double maximum_sleep_s)
         dropped_array_member(array_idx, 1, dptr);
 
         dropped_file next;
-        next.name = name;
-        next.data = data;
+        next.name = fixup_string(name);
+        next.data = fixup_string(data);
 
         dropped.push_back(next);
     }
