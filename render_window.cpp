@@ -213,6 +213,84 @@ vec2i glfw_backend::get_window_position()
     return {wxpos, wypos};
 }
 
+#ifdef __EMSCRIPTEN__
+EM_JS(int, num_dropped_files, (),
+{
+    return Module.dropped.length;
+});
+
+EM_JS(int, dropped_array_member_length, (int idx, int member),
+{
+    return Module.dropped[idx][member].length;
+});
+
+EM_JS(void, dropped_array_member, (int idx, int member, char* out),
+{
+    var member = Module.dropped[idx][member];
+
+    stringToUTF8(member, out, member.length+1);
+});
+
+EM_JS(void, clear_dropped, (),
+{
+    Module.dropped = [];
+});
+
+EM_JS(void, drag_drop_init, (),
+{
+    Module.dropped = [];
+
+    function dragenter(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+
+        console.log("dragenter");
+    }
+
+    function dragover(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+
+        console.log("dragover");
+    }
+
+    function drop(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const dt = e.dataTransfer;
+        const all_files = dt.files;
+
+        for(var i=0; i < all_files.length; i++)
+        {
+            const file = all_files[i];
+
+            var read = new FileReader();
+
+            read.readAsBinaryString(file);
+
+            read.onloadend = function()
+            {
+                Module.dropped.push([file.name, read.result]);
+                console.log(Module.dropped[Module.dropped.length-1]);
+            }
+        }
+
+        console.log("drop");
+    }
+
+    let elem = document.getElementById("canvas");
+    elem.addEventListener("dragenter", dragenter, false);
+    elem.addEventListener("dragover", dragover, false);
+    elem.addEventListener("drop", drop, false);
+
+    console.log("registered");
+});
+#endif // __EMSCRIPTEN__
+
 void glfw_backend::poll_events_only(double maximum_sleep_s)
 {
     assert(ctx.window);
@@ -231,6 +309,37 @@ void glfw_backend::poll_events_only(double maximum_sleep_s)
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
+
+    #ifdef __EMSCRIPTEN__
+    int num_files = num_dropped_files();
+
+    for(int array_idx = 0; array_idx < num_files; array_idx++)
+    {
+        int name_length = dropped_array_member_length(array_idx, 0);
+        int data_length = dropped_array_member_length(array_idx, 1);
+
+        std::string name;
+        name.resize(name_length + 1);
+
+        std::string data;
+        data.resize(data_length + 1);
+
+        char* nptr = &name[0];
+        char* dptr = &data[0];
+
+        dropped_array_member(array_idx, 0, nptr);
+        dropped_array_member(array_idx, 1, dptr);
+
+        dropped_file next;
+        next.name = name;
+        next.data = data;
+
+        dropped.push_back(next);
+    }
+
+    clear_dropped();
+
+    #endif // __EMSCRIPTEN__
 
     #ifdef __EMSCRIPTEN__
     ImGuiIO& io = ImGui::GetIO();
@@ -525,62 +634,6 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 
 }
 #endif // NO_OPENCL
-
-#ifdef __EMSCRIPTEN__
-EM_JS(void, drag_drop_init, (),
-{
-    Module.dropped = [];
-
-    function dragenter(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-
-        console.log("dragenter");
-    }
-
-    function dragover(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-
-        console.log("dragover");
-    }
-
-    function drop(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-
-        const dt = e.dataTransfer;
-        const all_files = dt.files;
-
-        for(var i=0; i < all_files.length; i++)
-        {
-            const file = all_files[i];
-
-            var read = new FileReader();
-
-            read.readAsBinaryString(file);
-
-            read.onloadend = function()
-            {
-                Module.dropped.push([file.name, read.result]);
-                console.log(Module.dropped[Module.dropped.length-1]);
-            }
-        }
-
-        console.log("drop");
-    }
-
-    let elem = document.getElementById("canvas");
-    elem.addEventListener("dragenter", dragenter, false);
-    elem.addEventListener("dragover", dragover, false);
-    elem.addEventListener("drop", drop, false);
-
-    console.log("registered");
-});
-#endif // __EMSCRIPTEN__
 
 render_window::render_window(render_settings sett, const std::string& window_title, backend_type::type type)
 {
