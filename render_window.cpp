@@ -151,7 +151,11 @@ EM_BOOL on_emscripten_resize(int eventType, const EmscriptenUiEvent *uiEvent, vo
         vec2i dim = {uiEvent->windowInnerWidth, uiEvent->windowInnerHeight};
 
         b.resize(dim);
+
+        return false;
     }
+
+    return false;
 }
 #endif // __EMSCRIPTEN__
 
@@ -522,7 +526,7 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 }
 #endif // NO_OPENCL
 
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
 EM_JS(void, drag_drop_init, (),
 {
     function dragenter(e)
@@ -549,8 +553,12 @@ EM_JS(void, drag_drop_init, (),
         console.log("drop");
     }
 
-    let elem = document.getElementById("fullscreenoverlay");
+    let elem = document.getElementById("canvas");
     elem.addEventListener("dragenter", dragenter, false);
+    elem.addEventListener("dragover", dragover, false);
+    elem.addEventListener("drop", drop, false);
+
+    console.log("registered");
 });
 #endif // __EMSCRIPTEN__
 
