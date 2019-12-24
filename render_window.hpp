@@ -110,6 +110,10 @@ struct generic_backend
     virtual vec2i get_window_position(){return {0,0};}
     virtual void resize(vec2i dim){}
 
+    virtual bool has_dropped_file(){return false;}
+    virtual dropped_file get_next_dropped_file(){return dropped_file();}
+    virtual void pop_dropped_file(){}
+
     virtual ~generic_backend(){}
 };
 
@@ -135,9 +139,14 @@ struct glfw_backend : generic_backend
     vec2i get_window_position() override;
     void resize(vec2i dim) override;
 
+    bool has_dropped_file() override;
+    dropped_file get_next_dropped_file() override;
+    void pop_dropped_file() override;
+
     vec2i last_size;
 private:
     bool closing = false;
+    std::vector<dropped_file> dropped;
 };
 
 #ifdef USE_IMTUI
@@ -200,13 +209,12 @@ struct render_window
     void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
     void render_texture(unsigned int handle, vec2f p_min, vec2f p_max);
 
-    bool has_dropped_file();
-    dropped_file get_next_dropped_file();
-    void pop_dropped_file();
+    bool has_dropped_file(){return backend->has_dropped_file();}
+    dropped_file get_next_dropped_file(){return backend->get_next_dropped_file();}
+    void pop_dropped_file(){return backend->pop_dropped_file();}
 
 private:
     render_settings settings;
-    std::vector<dropped_file> dropped;
 };
 
 namespace gui

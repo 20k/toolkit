@@ -543,6 +543,27 @@ void glfw_backend::resize(vec2i dim)
     init_screen(dim);
 }
 
+bool glfw_backend::has_dropped_file()
+{
+    return dropped.size() > 0;
+}
+
+dropped_file glfw_backend::get_next_dropped_file()
+{
+    if(dropped.size() == 0)
+        return dropped_file();
+
+    return dropped[0];
+}
+
+void glfw_backend::pop_dropped_file()
+{
+    if(dropped.size() == 0)
+        return;
+
+    dropped.erase(dropped.begin());
+}
+
 #ifdef USE_IMTUI
 imtui_backend::imtui_backend(const render_settings& sett, const std::string& window_title)
 {
