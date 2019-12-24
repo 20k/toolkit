@@ -522,6 +522,38 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 }
 #endif // NO_OPENCL
 
+#ifndef __EMSCRIPTEN__
+EM_JS(void, drag_drop_init, (),
+{
+    function dragenter(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+
+        console.log("dragenter");
+    }
+
+    function dragover(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+
+        console.log("dragover");
+    }
+
+    function drop(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+
+        console.log("drop");
+    }
+
+    let elem = document.getElementById("fullscreenoverlay");
+    elem.addEventListener("dragenter", dragenter, false);
+});
+#endif // __EMSCRIPTEN__
+
 render_window::render_window(render_settings sett, const std::string& window_title, backend_type::type type)
 {
     #ifdef __EMSCRIPTEN__
@@ -554,6 +586,8 @@ render_window::render_window(render_settings sett, const std::string& window_tit
 
     #ifdef __EMSCRIPTEN__
     ImGui::GetIO().IniFilename = "web/imgui.ini";
+
+    drag_drop_init();
     #endif // __EMSCRIPTEN__
 }
 
