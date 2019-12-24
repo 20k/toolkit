@@ -28,6 +28,12 @@ struct vertex;
     };
 }*/
 
+struct dropped_file
+{
+    std::string name;
+    std::string data;
+};
+
 struct render_settings : serialisable, free_function
 {
     int width = 0;
@@ -194,8 +200,13 @@ struct render_window
     void render(const std::vector<vertex>& vertices, texture* tex = nullptr);
     void render_texture(unsigned int handle, vec2f p_min, vec2f p_max);
 
+    bool has_dropped_file();
+    dropped_file get_next_dropped_file();
+    void pop_dropped_file();
+
 private:
     render_settings settings;
+    std::vector<dropped_file> dropped;
 };
 
 namespace gui

@@ -529,6 +529,8 @@ opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_im
 #ifdef __EMSCRIPTEN__
 EM_JS(void, drag_drop_init, (),
 {
+    Module.dropped = [];
+
     function dragenter(e)
     {
         e.stopPropagation();
@@ -549,6 +551,24 @@ EM_JS(void, drag_drop_init, (),
     {
         e.stopPropagation();
         e.preventDefault();
+
+        const dt = e.dataTransfer;
+        const all_files = dt.files;
+
+        for(var i=0; i < all_files.length; i++)
+        {
+            const file = all_files[i];
+
+            var read = new FileReader();
+
+            read.readAsBinaryString(file);
+
+            read.onloadend = function()
+            {
+                Module.dropped.push([file.name, read.result]);
+                console.log(Module.dropped[Module.dropped.length-1]);
+            }
+        }
 
         console.log("drop");
     }
