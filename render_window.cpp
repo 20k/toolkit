@@ -244,16 +244,12 @@ EM_JS(void, drag_drop_init, (),
     {
         e.stopPropagation();
         e.preventDefault();
-
-        console.log("dragenter");
     }
 
     function dragover(e)
     {
         e.stopPropagation();
         e.preventDefault();
-
-        console.log("dragover");
     }
 
     function drop(e)
@@ -278,8 +274,6 @@ EM_JS(void, drag_drop_init, (),
                 console.log(Module.dropped[Module.dropped.length-1]);
             }
         }
-
-        console.log("drop");
     }
 
     let elem = document.getElementById("canvas");
