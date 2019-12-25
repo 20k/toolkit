@@ -6,8 +6,17 @@
 ///a directory should be without prefixes, eg a/hello.txt
 namespace file
 {
-    std::string read(const std::string& file);
-    void write(const std::string& file, const std::string& data);
+    namespace mode
+    {
+        enum type
+        {
+            BINARY,
+            TEXT
+        };
+    }
+
+    std::string read(const std::string& file, mode::type m);
+    void write(const std::string& file, const std::string& data, mode::type m);
     void write_atomic(const std::string& file, const std::string& data);
     bool exists(const std::string& name);
     void rename(const std::string& from, const std::string& to);

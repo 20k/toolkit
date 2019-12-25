@@ -38,12 +38,14 @@ void sync_writes()
     #endif // __EMSCRIPTEN__
 }
 
-std::string file::read(const std::string& file)
+std::string file::read(const std::string& file, file::mode::type m)
 {
+    const char* fmode = m == file::mode::BINARY ? "rb" : "r";
+
     #ifndef __EMSCRIPTEN__
-    FILE* f = fopen(file.c_str(), "rb");
+    FILE* f = fopen(file.c_str(), fmode);
     #else
-    FILE* f = fopen(("web/" + file).c_str(), "rb");
+    FILE* f = fopen(("web/" + file).c_str(), fmode);
     #endif
 
     fseek(f, 0, SEEK_END);
@@ -54,19 +56,32 @@ std::string file::read(const std::string& file)
     buffer.resize(fsize + 1);
     fread(&buffer[0], fsize, 1, f);
     fclose(f);
+    buffer.resize(fsize);
 
     return buffer;
 }
 
-void file::write(const std::string& file, const std::string& data)
+void file::write(const std::string& file, const std::string& data, file::mode::type m)
 {
     {
-        #ifndef __EMSCRIPTEN__
-        std::ofstream out(file, std::ios::binary);
-        #else
-        std::ofstream out("web/" + file, std::ios::binary);
-        #endif
-        out << data;
+        if(m == file::mode::BINARY)
+        {
+            #ifndef __EMSCRIPTEN__
+            std::ofstream out(file, std::ios::binary);
+            #else
+            std::ofstream out("web/" + file, std::ios::binary);
+            #endif
+            out << data;
+        }
+        else if(m == file::mode::TEXT)
+        {
+            #ifndef __EMSCRIPTEN__
+            std::ofstream out(file);
+            #else
+            std::ofstream out("web/" + file);
+            #endif
+            out << data;
+        }
     }
 
     sync_writes();
