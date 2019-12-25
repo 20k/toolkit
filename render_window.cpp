@@ -292,7 +292,9 @@ std::string fixup_string(std::string in)
 
     int clen = strlen(in.c_str());
 
-    return std::string(in.begin(), in.begin() + clen);
+    in.resize(clen);
+
+    return in;
 }
 
 void glfw_backend::poll_events_only(double maximum_sleep_s)
