@@ -10,6 +10,7 @@
 #include <GLFW/glfw3.h>
 #include <map>
 #include <iostream>
+#include <toolkit/fs_helpers.hpp>
 
 #ifdef USE_IMTUI
 #include <imtui/imtui.h>
@@ -21,10 +22,14 @@
 #include <emscripten/html5.h>
 #endif // __EMSCRIPTEN__
 
+#ifndef __EMSCRIPTEN__
+#include <filesystem>
+#endif // __EMSCRIPTEN__
 
 namespace
 {
     thread_local std::map<std::string, bool> frost_map;
+    thread_local std::vector<dropped_file> dropped_files;
 }
 
 void glfw_error_callback(int error, const char* description)
@@ -159,10 +164,31 @@ EM_BOOL on_emscripten_resize(int eventType, const EmscriptenUiEvent *uiEvent, vo
 }
 #endif // __EMSCRIPTEN__
 
+#ifndef __EMSCRIPTEN__
+void drop_callback(GLFWwindow* window, int count, const char** paths)
+{
+    for(int i=0; i < count; i++)
+    {
+        std::string name = std::string(paths[i]);
+        std::string data = file::read(name, file::mode::TEXT);
+
+        dropped_file fle;
+        fle.name = std::filesystem::path(name).filename().string();
+        fle.data = data;
+
+        dropped_files.push_back(fle);
+    }
+}
+#endif // __EMSCRIPTEN__
+
 glfw_backend::glfw_backend(const render_settings& sett, const std::string& window_title) : ctx(sett, window_title)
 {
     #ifdef __EMSCRIPTEN__
     emscripten_set_resize_callback(nullptr, (void*)this, false, on_emscripten_resize);
+    #endif // __EMSCRIPTEN__
+
+    #ifndef __EMSCRIPTEN__
+    glfwSetDropCallback(ctx.window, drop_callback);
     #endif // __EMSCRIPTEN__
 }
 
@@ -356,6 +382,18 @@ void glfw_backend::poll_events_only(double maximum_sleep_s)
 
     io.MouseWheelH = -io.MouseWheelH; //?
     io.MouseWheel = -io.MouseWheel;
+    #endif // __EMSCRIPTEN__
+
+    #ifndef __EMSCRIPTEN__
+    if(dropped_files.size() > 0)
+    {
+        for(auto& i : dropped_files)
+        {
+            dropped.push_back(i);
+        }
+
+        dropped_files.clear();
+    }
     #endif // __EMSCRIPTEN__
 }
 
