@@ -715,19 +715,19 @@ EM_BOOL mouse_down_callback(int eventType, const EmscriptenMouseEvent* e, void* 
     return false;
 }
 
-EM_JS(void, mouseup_callback_copy, (),
+/*EM_JS(void, mouseup_callback_copy, (),
 {
     Module.clipbuffer.focus();
     Module.clipbuffer.value = "hellothere";
     Module.clipbuffer.setSelectionRange(0, Module.clipbuffer.value.length);
     var succeeded = document.execCommand('copy');
-});
+});*/
 
 EM_BOOL mouse_up_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
 {
     printf("Mouse up\n");
 
-    mouseup_callback_copy();
+    //mouseup_callback_copy();
 
     return false;
 }
