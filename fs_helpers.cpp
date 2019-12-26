@@ -207,25 +207,6 @@ void file::rename(const std::string& from, const std::string& to)
 }
 
 #ifdef __EMSCRIPTEN__
-#if 0
-EM_JS(void, handle_download, (const char* fullname, const char* shortname),
-{
-    var memoryFSname = UTF8ToString(fullname);
-    var localFSname = UTF8ToString(shortname);
-
-    var data = FS.readFile(memoryFSname);
-
-    var blob;
-    var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if(isSafari) {
-        blob = new Blob([data.buffer], {type: "application/octet-stream"});
-    } else {
-        blob = new Blob([data.buffer], {type: "application/octet-binary"});
-    }
-    saveAs(blob, localFSname);
-});
-#endif // 0
-
 EM_JS(void, handle_download, (const char* fullname),
 {
     var memoryFSname = UTF8ToString(fullname);
