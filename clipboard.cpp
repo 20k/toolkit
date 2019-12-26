@@ -9,6 +9,17 @@
 #endif // __EMSCRIPTEN__
 
 #ifdef __EMSCRIPTEN__
+EM_JS(int, init_copy, (),
+{
+    var clipboardBuffer = document.createElement('textarea');
+    clipboardBuffer.style.cssText = 'position:fixed; top:-10px; left:-10px; height:0; width:0; opacity:0;';
+    document.body.appendChild(clipboardBuffer);
+
+    Module.clipbuffer = clipboardBuffer;
+
+    return 0;
+});
+
 EM_JS(void, copy_js, (const char* data),
 {
     var set_name = UTF8ToString(data);
@@ -21,7 +32,16 @@ EM_JS(void, copy_js, (const char* data),
 
 EM_JS(void, update_clipboard_data, (),
 {
-    Module.osclipdata = window.clipboardData.getData('Text');
+    //Module.osclipdata = ClipboardEvent.clipboardData.getData('Text');
+    //Module.osclipdata = window.clipboardData.getData('Text');
+
+    if(!Module.osclipdata)
+        Module.osclipdata = "";
+
+    navigator.clipboard.readText().then(function(clipText)
+    {
+        Module.osclipdata = clipText
+    });
 });
 
 EM_JS(int, get_osclipdata_length, (),
@@ -29,9 +49,9 @@ EM_JS(int, get_osclipdata_length, (),
     return Module.osclipdata.length;
 });
 
-EM_JS(void, get_osclipdata, (char* out),
+EM_JS(void, get_osclipdata, (char* out, int len),
 {
-    stringToUTF8(Module.osclipdata, out, Module.osclipdata.length+1);
+    stringToUTF8(Module.osclipdata, out, len);
 });
 
 #endif // __EMSCRIPTEN__
@@ -41,6 +61,7 @@ void clipboard::set(const std::string& data)
     #ifndef __EMSCRIPTEN__
     glfwSetClipboardString(NULL, data.c_str());
     #else
+    static int init_clip = init_copy();
     copy_js(data.c_str());
     #endif
 }
@@ -55,11 +76,10 @@ std::string clipboard::get()
 
     return ptr;
     #else
-    update_clipboard_data();
     int clip_len = get_osclipdata_length();
     std::string clip_buf;
     clip_buf.resize(clip_len + 1);
-    get_osclipdata(&clip_buf[0]);
+    get_osclipdata(&clip_buf[0], clip_len + 1);
 
     int cstrlen = strlen(clip_buf.c_str());
 
@@ -67,4 +87,9 @@ std::string clipboard::get()
 
     return clip_buf;
     #endif
+}
+
+void clipboard::poll()
+{
+    update_clipboard_data();
 }

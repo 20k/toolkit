@@ -732,14 +732,6 @@ EM_BOOL mouse_up_callback(int eventType, const EmscriptenMouseEvent* e, void* us
     return false;
 }
 
-EM_JS(void, init_copy, (),
-{
-    var clipboardBuffer = document.createElement('textarea');
-    clipboardBuffer.style.cssText = 'position:fixed; top:-10px; left:-10px; height:0; width:0; opacity:0;';
-    document.body.appendChild(clipboardBuffer);
-
-    Module.clipbuffer = clipboardBuffer;
-});
 
 #endif // __EMSCRIPTEN__
 
@@ -777,7 +769,6 @@ render_window::render_window(render_settings sett, const std::string& window_tit
     ImGui::GetIO().IniFilename = "web/imgui.ini";
 
     drag_drop_init();
-    init_copy();
 
     //emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, key_down_callback);
     //emscripten_set_mousedown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_down_callback);
