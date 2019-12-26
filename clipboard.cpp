@@ -91,5 +91,7 @@ std::string clipboard::get()
 
 void clipboard::poll()
 {
+    #ifdef __EMSCRIPTEN__
     update_clipboard_data();
+    #endif // __EMSCRIPTEN__
 }
