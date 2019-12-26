@@ -181,10 +181,37 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
 }
 #endif // __EMSCRIPTEN__
 
+#ifdef __EMSCRIPTEN__
+EM_BOOL key_down_callback(int eventType, const EmscriptenKeyboardEvent *e, void *userData)
+{
+    //printf("IN KEY CALLBACK %i\n", eventType);
+
+    return false;
+}
+
+EM_BOOL mouse_down_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
+{
+    printf("Mouse Down\n");
+
+    return false;
+}
+
+EM_BOOL mouse_up_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
+{
+    printf("Mouse up\n");
+
+    return false;
+}
+
+#endif // __EMSCRIPTEN__
+
 glfw_backend::glfw_backend(const render_settings& sett, const std::string& window_title) : ctx(sett, window_title)
 {
     #ifdef __EMSCRIPTEN__
     emscripten_set_resize_callback(nullptr, (void*)this, false, on_emscripten_resize);
+    //emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, key_down_callback);
+    //emscripten_set_mousedown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_down_callback);
+    emscripten_set_mouseup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_up_callback);
     #endif // __EMSCRIPTEN__
 
     #ifndef __EMSCRIPTEN__
