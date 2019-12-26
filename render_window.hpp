@@ -195,8 +195,8 @@ struct render_window
 
     void set_srgb(bool enabled);
 
-    void poll(double maximum_sleep_s = 0){clipboard::poll(); return backend->poll(maximum_sleep_s);}
-    void poll_events_only(double maximum_sleep_s = 0) {clipboard::poll(); return backend->poll_events_only(maximum_sleep_s);}
+    void poll(double maximum_sleep_s = 0){return backend->poll(maximum_sleep_s);}
+    void poll_events_only(double maximum_sleep_s = 0) {return backend->poll_events_only(maximum_sleep_s);}
     void poll_issue_new_frame_only() {return backend->poll_issue_new_frame_only();}
 
     std::vector<frostable> get_frostables();

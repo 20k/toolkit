@@ -32,6 +32,9 @@ EM_JS(void, copy_js, (const char* data),
 
 EM_JS(void, update_clipboard_data, (),
 {
+    if(!document.hasFocus())
+        return;
+
     //Module.osclipdata = ClipboardEvent.clipboardData.getData('Text');
     //Module.osclipdata = window.clipboardData.getData('Text');
 
