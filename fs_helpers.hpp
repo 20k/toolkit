@@ -15,6 +15,13 @@ namespace file
         };
     }
 
+    ///for emscripten performance reasons
+    struct manual_fs_sync
+    {
+        manual_fs_sync();
+        ~manual_fs_sync();
+    };
+
     std::string read(const std::string& file, mode::type m);
     void write(const std::string& file, const std::string& data, mode::type m);
     void write_atomic(const std::string& file, const std::string& data);

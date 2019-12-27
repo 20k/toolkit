@@ -1,12 +1,12 @@
 #include "fs_helpers.hpp"
 
-#include <fstream>
 #include "clock.hpp"
 
 #include <string>
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <atomic>
 
 #ifdef __WIN32__
 #define WIN32_LEAN_AND_MEAN
@@ -31,11 +31,33 @@ EM_JS(void, syncer, (),
 });
 #endif // __EMSCRIPTEN__
 
+namespace
+{
+    thread_local int syncs{0};
+    thread_local bool syncs_dirty = false;
+}
+
 void sync_writes()
 {
     #ifdef __EMSCRIPTEN__
-    syncer();
+    if(syncs == 0 && syncs_dirty)
+    {
+        syncer();
+        syncs_dirty = false;
+    }
     #endif // __EMSCRIPTEN__
+}
+
+file::manual_fs_sync::manual_fs_sync()
+{
+    syncs++;
+}
+
+file::manual_fs_sync::~manual_fs_sync()
+{
+    syncs--;
+
+    sync_writes();
 }
 
 std::string file::read(const std::string& file, file::mode::type m)
