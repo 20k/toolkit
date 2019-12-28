@@ -79,7 +79,7 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
     if(sett.no_double_buffer)
-        glfwWindowHint( GLFW_DOUBLEBUFFER, GL_FALSE );
+        glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
 
     //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
@@ -190,6 +190,8 @@ glfw_backend::glfw_backend(const render_settings& sett, const std::string& windo
     #ifndef __EMSCRIPTEN__
     glfwSetDropCallback(ctx.window, drop_callback);
     #endif // __EMSCRIPTEN__
+
+    set_vsync(sett.vsync);
 }
 
 void glfw_backend::init_screen(vec2i dim)
@@ -321,6 +323,21 @@ std::string fixup_string(std::string in)
     in.resize(clen);
 
     return in;
+}
+
+bool glfw_backend::is_vsync()
+{
+    return is_vsync_enabled;
+}
+
+void glfw_backend::set_vsync(bool enabled)
+{
+    if(enabled)
+        glfwSwapInterval(1);
+    else
+        glfwSwapInterval(0);
+
+    is_vsync_enabled = enabled;
 }
 
 void glfw_backend::poll_events_only(double maximum_sleep_s)
@@ -754,6 +771,7 @@ render_settings render_window::get_render_settings()
 
     sett.width = dim.x();
     sett.height = dim.y();
+    sett.vsync = backend->is_vsync();
 
     return sett;
 }

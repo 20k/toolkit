@@ -44,6 +44,7 @@ struct render_settings : serialisable, free_function
     bool no_double_buffer = false;
     bool viewports = false;
     bool opencl = false;
+    bool vsync = false;
 };
 
 namespace backend_type
@@ -98,6 +99,8 @@ struct opencl_context
 struct generic_backend
 {
     //virtual void set_srgb(bool enabled){}
+    virtual bool is_vsync(){return false;}
+    virtual void set_vsync(bool enabled){}
     virtual void poll(double maximum_sleep_s = 0){}
     virtual void poll_events_only(double maximum_sleep_s = 0){}
     virtual void poll_issue_new_frame_only(){}
@@ -127,6 +130,8 @@ struct glfw_backend : generic_backend
     ~glfw_backend();
 
     //void set_srgb(bool enabled) override;
+    bool is_vsync() override;
+    void set_vsync(bool enabled) override;
     void poll(double maximum_sleep_s = 0) override;
     void poll_events_only(double maximum_sleep_s = 0) override;
     void poll_issue_new_frame_only() override;
@@ -148,6 +153,7 @@ struct glfw_backend : generic_backend
 private:
     bool closing = false;
     std::vector<dropped_file> dropped;
+    bool is_vsync_enabled = false;
 };
 
 #ifdef USE_IMTUI
@@ -194,6 +200,7 @@ struct render_window
     vec2i get_window_position(){return backend->get_window_position();}
 
     void set_srgb(bool enabled);
+    void set_vsync(bool enabled){return backend->set_vsync(enabled);}
 
     void poll(double maximum_sleep_s = 0){return backend->poll(maximum_sleep_s);}
     void poll_events_only(double maximum_sleep_s = 0) {return backend->poll_events_only(maximum_sleep_s);}
