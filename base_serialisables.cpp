@@ -13,4 +13,5 @@ DEFINE_SERIALISE_FUNCTION(render_settings)
     DO_FSERIALISE(no_double_buffer);
     DO_FSERIALISE(viewports);
     DO_FSERIALISE(opencl);
+    DO_FSERIALISE(vsync);
 }
