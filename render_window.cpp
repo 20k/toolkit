@@ -192,6 +192,11 @@ glfw_backend::glfw_backend(const render_settings& sett, const std::string& windo
     #endif // __EMSCRIPTEN__
 
     set_vsync(sett.vsync);
+
+    #ifndef NO_OPENCL
+    if(sett.opencl)
+        clctx = new opencl_context();
+    #endif // NO_OPENCL
 }
 
 void glfw_backend::init_screen(vec2i dim)
@@ -495,7 +500,7 @@ void glfw_backend::display()
 
     if(clctx)
     {
-        ImGui::GetBackgroundDrawList()->AddCallback(post_render, this);
+        //ImGui::GetBackgroundDrawList()->AddCallback(post_render, this);
     }
 
     ImGui::Render();
