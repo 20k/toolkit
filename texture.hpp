@@ -3,11 +3,21 @@
 
 #include <vec/vec.hpp>
 
+struct texture_settings
+{
+    int width = 0;
+    int height = 0;
+    bool is_srgb = true;
+};
+
 struct texture
 {
     unsigned int handle = 0;
 
+    [[deprecated]]
     void load_from_memory(const uint8_t* pixels_rgba, vec2i dim);
+
+    void load_from_memory(const texture_settings& settings, const uint8_t* pixels_rgba);
     vec2i get_size();
 
     vec2i dim;
