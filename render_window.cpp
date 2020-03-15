@@ -873,11 +873,20 @@ void render_window::render(const std::vector<vertex>& vertices, texture* tex)
             vtx_write[i].uv.y = vertices[i].uv.y();
         }
 
-        vec3f srgb_col = lin_to_srgb_approx(vertices[i].colour.xyz()) * 255.f;
+        if((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_IsSRGB) == 0)
+        {
+            vec3f srgb_col = lin_to_srgb_approx(vertices[i].colour.xyz()) * 255.f;
 
-        srgb_col = clamp(srgb_col, 0.f, 255.f);
+            srgb_col = clamp(srgb_col, 0.f, 255.f);
 
-        vtx_write[i].col = IM_COL32((int)srgb_col.x(), (int)srgb_col.y(), (int)srgb_col.z(), (int)(vertices[i].colour.w() * 255));
+            vtx_write[i].col = IM_COL32((int)srgb_col.x(), (int)srgb_col.y(), (int)srgb_col.z(), (int)(vertices[i].colour.w() * 255));
+        }
+        else
+        {
+            vec3f srgb_col = vertices[i].colour.xyz() * 255.f;
+
+            vtx_write[i].col = IM_COL32((int)srgb_col.x(), (int)srgb_col.y(), (int)srgb_col.z(), (int)(vertices[i].colour.w() * 255));
+        }
 
         idx_write[i] = vtx_current_idx + i;
     }
