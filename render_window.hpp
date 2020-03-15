@@ -100,19 +100,19 @@ struct generic_backend
 {
     //virtual void set_srgb(bool enabled){}
     virtual bool is_vsync(){return false;}
-    virtual void set_vsync(bool enabled){}
-    virtual void poll(double maximum_sleep_s = 0){}
-    virtual void poll_events_only(double maximum_sleep_s = 0){}
+    virtual void set_vsync(bool enabled){(void)enabled;}
+    virtual void poll(double maximum_sleep_s = 0){(void)maximum_sleep_s;}
+    virtual void poll_events_only(double maximum_sleep_s = 0){(void)maximum_sleep_s;}
     virtual void poll_issue_new_frame_only(){}
     virtual void display(){}
     virtual void display_last_frame(){}
     virtual bool should_close(){return true;}
     virtual void close(){}
-    virtual void init_screen(vec2i dim){}
+    virtual void init_screen(vec2i dim){(void)dim;}
     virtual opencl_context* get_opencl_context(){return nullptr;}
     virtual vec2i get_window_size(){return {ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y};}
     virtual vec2i get_window_position(){return {0,0};}
-    virtual void resize(vec2i dim){}
+    virtual void resize(vec2i dim){(void)dim;}
 
     virtual bool has_dropped_file(){return false;}
     virtual dropped_file get_next_dropped_file(){return dropped_file();}
