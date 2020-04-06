@@ -8,6 +8,9 @@ struct texture_settings
     int width = 0;
     int height = 0;
     bool is_srgb = true;
+
+    bool magnify_linear = true;
+    bool shrink_linear = true;
 };
 
 struct texture
