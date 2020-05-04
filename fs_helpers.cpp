@@ -127,7 +127,7 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
     #ifdef __WIN32__
     HANDLE handle = CreateFile(atomic_file.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     WriteFile(handle, &data[0], data.size(), nullptr, nullptr);
-    FlushFileBuffers(handle);
+    //FlushFileBuffers(handle);
     CloseHandle(handle);
     #else
     int fd = open(atomic_file.c_str(), O_CREAT | O_DIRECT | O_SYNC | O_TRUNC | O_WRONLY, 0777);
