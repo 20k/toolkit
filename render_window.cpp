@@ -37,6 +37,25 @@ void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+struct glfw_user_data
+{
+    int max_frames = 0;
+};
+
+void maximise_callback(GLFWwindow* window, int maximized)
+{
+    if(maximized)
+    {
+        glfw_user_data* data = (glfw_user_data*)glfwGetWindowUserPointer(window);
+        data->max_frames = 30;
+    }
+    else
+    {
+        glfw_user_data* data = (glfw_user_data*)glfwGetWindowUserPointer(window);
+        data->max_frames = 0;
+    }
+}
+
 void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 {
     int wx = dim.x();
@@ -90,6 +109,13 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
         glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 
     window = glfwCreateWindow(sett.width, sett.height, window_title.c_str(), nullptr, nullptr);
+
+    {
+        glfw_user_data* data = new glfw_user_data;
+        glfwSetWindowUserPointer(window, (void*)data);
+    }
+
+    glfwSetWindowMaximizeCallback(window, maximise_callback);
 
     if(window == nullptr)
         throw std::runtime_error("Nullptr window in glfw");
@@ -504,6 +530,14 @@ void glfw_backend::display()
         //ImGui::GetBackgroundDrawList()->AddCallback(post_render, this);
     }
 
+    glfw_user_data* user_data = (glfw_user_data*)glfwGetWindowUserPointer(ctx.window);
+
+    if(user_data->max_frames > 0)
+    {
+        glfwSetWindowPos(ctx.window, 0, 0);
+        user_data->max_frames--;
+    }
+
     ImGui::Render();
 
     vec2i dim = get_window_size();
@@ -557,6 +591,14 @@ void glfw_backend::display()
 void glfw_backend::display_last_frame()
 {
     assert(ctx.window);
+
+    glfw_user_data* user_data = (glfw_user_data*)glfwGetWindowUserPointer(ctx.window);
+
+    if(user_data->max_frames > 0)
+    {
+        glfwSetWindowPos(ctx.window, 0, 0);
+        user_data->max_frames--;
+    }
 
     if(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
