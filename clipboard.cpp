@@ -75,7 +75,7 @@ std::string clipboard::get()
     const char* ptr = glfwGetClipboardString(NULL);
 
     if(ptr == nullptr)
-        throw std::runtime_error("Clipboard Error");
+        return "";
 
     return ptr;
     #else
