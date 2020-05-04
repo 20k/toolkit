@@ -45,6 +45,7 @@ struct render_settings : serialisable, free_function
     bool viewports = false;
     bool opencl = false;
     bool vsync = false;
+    bool no_decoration = false;
 };
 
 namespace backend_type

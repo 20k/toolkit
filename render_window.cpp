@@ -77,6 +77,7 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
     #endif
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_DECORATED, !sett.no_decoration);
 
     if(sett.no_double_buffer)
         glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
