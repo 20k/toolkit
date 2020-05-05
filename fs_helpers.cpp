@@ -109,7 +109,7 @@ void file::write(const std::string& file, const std::string& data, file::mode::t
     sync_writes();
 }
 
-void file::write_atomic(const std::string& in_file, const std::string& data)
+void file::write_atomic(const std::string& in_file, const std::string& data, file::mode::type m)
 {
     if(data.size() == 0)
         return;
@@ -124,7 +124,7 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
     std::string atomic_file = file + atomic_extension;
     std::string backup_file = file + ".back";
 
-    #ifdef __WIN32__
+    /*#ifdef __WIN32__
     HANDLE handle = CreateFile(atomic_file.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     WriteFile(handle, &data[0], data.size(), nullptr, nullptr);
     //FlushFileBuffers(handle);
@@ -149,7 +149,22 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
 
     close(fd);
 
-    #endif // __WIN32__
+    return;
+
+    #endif // __WIN32__*/
+
+    if(m == file::mode::TEXT)
+    {
+        std::ofstream out(atomic_file);
+
+        out << data;
+    }
+    else
+    {
+        std::ofstream out(atomic_file, std::ios::binary);
+
+        out << data;
+    }
 
     sync_writes();
 
@@ -160,7 +175,12 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
         return;
     }
 
-    steady_timer timer;
+    if(file::exists(backup_file))
+    {
+        ::remove(backup_file.c_str());
+    }
+
+    /*steady_timer timer;
 
     bool write_success = false;
     bool any_errors = false;
@@ -168,7 +188,8 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
     do
     {
         #ifdef __WIN32__
-        bool err = ReplaceFileA(file.c_str(), atomic_file.c_str(), backup_file.c_str(), REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr) == 0;
+        //bool err = ReplaceFileA(file.c_str(), atomic_file.c_str(), backup_file.c_str(), REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr) == 0;
+        bool err = ReplaceFileA(file.c_str(), atomic_file.c_str(), nullptr, REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr) == 0;
         #else
         bool err = ::rename(atomic_file.c_str(), file.c_str()) != 0;
         #endif // __WIN32__
@@ -194,17 +215,20 @@ void file::write_atomic(const std::string& in_file, const std::string& data)
 
         sync_writes();
     }
-    while(timer.get_elapsed_time_s() < 1);
+    while(timer.get_elapsed_time_s() < 1);*/
 
-    if(!write_success)
+    ::rename(file.c_str(), backup_file.c_str());
+    ::rename(atomic_file.c_str(), file.c_str());
+
+    /*if(!write_success)
     {
         throw std::runtime_error("Explod in atomic write");
-    }
+    }*/
 
-    if(any_errors)
+    /*if(any_errors)
     {
         printf("atomic_write had errors but recovered");
-    }
+    }*/
 }
 
 bool file::exists(const std::string& name)

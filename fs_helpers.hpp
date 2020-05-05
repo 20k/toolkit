@@ -24,7 +24,7 @@ namespace file
 
     std::string read(const std::string& file, mode::type m);
     void write(const std::string& file, const std::string& data, mode::type m);
-    void write_atomic(const std::string& file, const std::string& data);
+    void write_atomic(const std::string& file, const std::string& data, mode::type m);
     bool exists(const std::string& name);
     void rename(const std::string& from, const std::string& to);
 
