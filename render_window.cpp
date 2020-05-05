@@ -42,6 +42,7 @@ struct glfw_user_data
     int max_frames = 0;
 };
 
+#ifndef __EMSCRIPTEN__
 void maximise_callback(GLFWwindow* window, int maximized)
 {
     if(maximized)
@@ -55,6 +56,7 @@ void maximise_callback(GLFWwindow* window, int maximized)
         data->max_frames = 0;
     }
 }
+#endif // __EMSCRIPTEN__
 
 void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 {
@@ -115,7 +117,9 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
         glfwSetWindowUserPointer(window, (void*)data);
     }
 
+    #ifndef __EMSCRIPTEN__
     glfwSetWindowMaximizeCallback(window, maximise_callback);
+    #endif // __EMSCRIPTEN__
 
     if(window == nullptr)
         throw std::runtime_error("Nullptr window in glfw");
