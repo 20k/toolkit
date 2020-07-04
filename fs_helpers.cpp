@@ -70,9 +70,18 @@ std::string file::read(const std::string& file, file::mode::type m)
     FILE* f = fopen(("web/" + file).c_str(), fmode);
     #endif
 
+    if(f == nullptr)
+        return "";
+
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
+
+    if(fsize == -1L)
+    {
+        fclose(f);
+        return "";
+    }
 
     std::string buffer;
     buffer.resize(fsize + 1);
