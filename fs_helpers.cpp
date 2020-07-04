@@ -252,6 +252,15 @@ void file::rename(const std::string& from, const std::string& to)
     sync_writes(); //?
 }
 
+bool file::remove(const std::string& name)
+{
+    #ifndef __EMSCRIPTEN__
+    return ::remove(name.c_str()) == 0;
+    #else
+    return ::remove(("web/" + name).c_str()) == 0;
+    #endif
+}
+
 #ifdef __EMSCRIPTEN__
 EM_JS(void, handle_download, (const char* fullname),
 {
