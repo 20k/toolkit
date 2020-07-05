@@ -62,7 +62,7 @@ file::manual_fs_sync::~manual_fs_sync()
 
 std::string file::read(const std::string& file, file::mode::type m)
 {
-    const char* fmode = m == file::mode::BINARY ? "rb" : "r";
+    const char* fmode = (m == file::mode::BINARY) ? "rb" : "r";
 
     #ifndef __EMSCRIPTEN__
     FILE* f = fopen(file.c_str(), fmode);
@@ -84,10 +84,11 @@ std::string file::read(const std::string& file, file::mode::type m)
     }
 
     std::string buffer;
-    buffer.resize(fsize + 1);
-    fread(&buffer[0], fsize, 1, f);
-    fclose(f);
     buffer.resize(fsize);
+    size_t real = fread(buffer.data(), 1, fsize, f);
+    buffer.resize(real);
+
+    fclose(f);
 
     return buffer;
 }
