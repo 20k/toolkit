@@ -397,10 +397,15 @@ void cl::image_base::clear(cl::command_queue& cqueue)
     }
 }
 
-/*void cl::image::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+void cl::image::write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region)
 {
-    size_t origin =
-}*/
+    cl_int err = clEnqueueWriteImage(write_on.native_command_queue.data, native_mem_object.data, true, &origin.v[0], &region.v[0], 0, 0, ptr, 0, nullptr, nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not write to image");
+    }
+}
 
 cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : kernels(ctx.kernels)
 {

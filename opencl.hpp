@@ -241,9 +241,24 @@ namespace cl
             return alloc_impl(init.size(), storage, format);
         }
 
-        /*void write(command_queue& write_on, const char* ptr, int64_t bytes);
+        void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region);
 
-        template<typename T>
+        template<int N>
+        void write(command_queue& write_on, const char* ptr, const vec<N, size_t>& origin, const vec<N, size_t>& region)
+        {
+            vec<3, size_t> forigin;
+            vec<3, size_t> fregion = {1,1,1};
+
+            for(int i=0; i < N && i < 3; i++)
+            {
+                forigin.v[i] = origin.v[i];
+                fregion.v[i] = region.v[i];
+            }
+
+            write_impl(write_on, ptr, forigin, fregion);
+        }
+
+        /*template<typename T>
         void write(command_queue& write_on, const std::vector<T>& data)
         {
             if(data.size() == 0)
