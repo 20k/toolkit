@@ -319,6 +319,34 @@ void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t byt
     }
 }
 
+void event_memory_free(cl_event event, cl_int event_command_status, void* user_data)
+{
+    if(event_command_status != CL_COMPLETE)
+        return;
+
+    delete [] (char*)user_data;
+}
+
+void cl::buffer::write_async(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+{
+    assert(bytes <= alloc_size);
+
+    cl_event evt;
+
+    char* nptr = new char[bytes];
+
+    memcpy(nptr, ptr, bytes);
+
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, nptr, 0, nullptr, &evt);
+
+    clSetEventCallback(evt, CL_COMPLETE, &event_memory_free, nptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not write");
+    }
+}
+
 void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
 {
     assert(bytes <= alloc_size);
@@ -328,6 +356,18 @@ void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not read");
+    }
+}
+
+void cl::buffer::set_to_zero(cl::command_queue& write_on)
+{
+    static int zero = 0;
+
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, (const void*)&zero, 1, 0, alloc_size, 0, nullptr, nullptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not set_to_zero");
     }
 }
 
