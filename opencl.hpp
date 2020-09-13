@@ -282,6 +282,14 @@ namespace cl
 
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
         void block();
+
+    protected:
+        command_queue();
+    };
+
+    struct device_command_queue : command_queue
+    {
+        device_command_queue(context& ctx, cl_command_queue_properties props = 0);
     };
 
     struct gl_rendertexture : image_base

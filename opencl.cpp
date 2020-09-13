@@ -443,7 +443,7 @@ void cl::image::write_impl(command_queue& write_on, const char* ptr, const vec<3
 
     if(err != CL_SUCCESS)
     {
-        throw std::runtime_error("Could not write to image");
+        throw std::runtime_error("Could not write to image " + std::to_string(err));
     }
 }
 
@@ -465,6 +465,34 @@ cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties p
 
     native_command_queue.data = cqueue;
 
+    native_context = ctx.native_context;
+}
+
+cl::command_queue::command_queue()
+{
+
+}
+
+cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queue_properties props)
+{
+    cl_int err;
+
+    kernels = ctx.kernels;
+
+    cl_queue_properties qprop[] = { CL_QUEUE_SIZE, 4096, CL_QUEUE_PROPERTIES,
+     (cl_command_queue_properties)(CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE |
+                                   CL_QUEUE_ON_DEVICE |
+                                   CL_QUEUE_ON_DEVICE_DEFAULT), 0 };
+
+    cl_command_queue cqueue = clCreateCommandQueueWithProperties(ctx.native_context.data, ctx.selected_device, qprop, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "Error creating command queue " << err << std::endl;
+        throw std::runtime_error("Could not make command queue");
+    }
+
+    native_command_queue.data = cqueue;
     native_context = ctx.native_context;
 }
 
