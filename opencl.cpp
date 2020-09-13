@@ -468,8 +468,10 @@ cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties p
     native_context = ctx.native_context;
 }
 
-void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
 {
+    cl::event ret;
+
     assert(global_ws.size() == local_ws.size());
 
     auto kernel_it = kernels->find(kname);
@@ -511,10 +513,12 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
         }
     }
 
+
+
     cl_int err = CL_SUCCESS;
 
     #ifndef GPU_PROFILE
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, nullptr);
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
     #else
 
     cl_event local;
@@ -544,6 +548,8 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
     {
         std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kname << std::endl;
     }
+
+    return ret;
 }
 
 void cl::command_queue::block()
