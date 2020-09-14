@@ -496,7 +496,7 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
     native_context = ctx.native_context;
 }
 
-cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
 {
     cl::event ret;
 
@@ -541,11 +541,14 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
         }
     }
 
-
+    static_assert(sizeof(cl::event) == sizeof(cl_event));
 
     cl_int err = CL_SUCCESS;
 
     #ifndef GPU_PROFILE
+    if(deps.size() > 0)
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
+    else
         err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
     #else
 
@@ -578,6 +581,13 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
     }
 
     return ret;
+}
+
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
+{
+    std::vector<cl::event> evts;
+
+    return exec(kname, pack, global_ws, local_ws, evts);
 }
 
 void cl::command_queue::block()
