@@ -708,4 +708,30 @@ void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
     }
 }
 
+bool cl::supports_extension(cl::context& ctx, const std::string& name)
+{
+    size_t arr_size = 0;
+    cl_int err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, 0, nullptr, &arr_size);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Error in clGetDeviceInfo");
+    }
+
+    if(arr_size == 0)
+        return false;
+
+    std::string extensions;
+    extensions.resize(arr_size + 1);
+
+    err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, arr_size, &extensions[0], nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Error in clGetDeviceInfo");
+    }
+
+    return extensions.find(name) != std::string::npos;
+}
+
 #endif // NO_OPENCL
