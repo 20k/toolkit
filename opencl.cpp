@@ -552,26 +552,21 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
         err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
     #else
 
-    cl_event local;
-
-    if(out == nullptr)
-        out = &local;
-
-    err = clEnqueueNDRangeKernel(native_command_queue.data, kname.get(), dim, nullptr, g_ws, l_ws, 0, nullptr, out);
+    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
 
     cl_ulong start;
     cl_ulong finish;
 
     block();
 
-    clGetEventProfilingInfo(*out, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
-    clGetEventProfilingInfo(*out, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
 
     cl_ulong diff = finish - start;
 
     double ddiff = diff / 1000. / 1000.;
 
-    std::cout << "kernel " << kname.name << " ms " << ddiff << std::endl;
+    std::cout << "kernel " << kname << " ms " << ddiff << std::endl;
 
     #endif // GPU_PROFILE
 
