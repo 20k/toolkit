@@ -274,6 +274,48 @@ namespace cl
         }*/
     };
 
+
+    struct image_with_mipmaps : image_base
+    {
+        base<cl_context, clRetainContext, clReleaseContext> native_context;
+
+        int dimensions = 1;
+
+        image_with_mipmaps(cl::context& ctx);
+
+        void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, int mip_levels, const cl_image_format& format);
+
+        template<int N>
+        void alloc(const vec<N, int>& in_dims, int mip_levels, const cl_image_format& format)
+        {
+            static_assert(N > 0 && N <= 3);
+
+            std::array<int64_t, 3> storage = {1,1,1};
+
+            for(int i=0; i < N; i++)
+                storage[i] = in_dims.v[i];
+
+            return alloc_impl(N, storage, mip_levels, format);
+        }
+
+        void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level);
+
+        template<int N>
+        void write(command_queue& write_on, const char* ptr, const vec<N, size_t>& origin, const vec<N, size_t>& region, int mip_level)
+        {
+            vec<3, size_t> forigin;
+            vec<3, size_t> fregion = {1,1,1};
+
+            for(int i=0; i < N && i < 3; i++)
+            {
+                forigin.v[i] = origin.v[i];
+                fregion.v[i] = region.v[i];
+            }
+
+            write_impl(write_on, ptr, forigin, fregion, mip_level);
+        }
+    };
+
     struct command_queue
     {
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
@@ -307,6 +349,7 @@ namespace cl
 
         void create(int w, int h);
         void create_from_texture(GLuint texture_id);
+        void create_from_texture_with_mipmaps(GLuint texture_id, int mip_level);
         void create_from_framebuffer(GLuint framebuffer_id);
 
         void acquire(command_queue& cqueue);
@@ -409,6 +452,17 @@ void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
 template<>
 inline
 void cl::args::push_back<cl::image>(cl::image& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_mem_object.data;
+    inf.size = sizeof(cl_mem);
+
+    arg_list.push_back(inf);
+}
+
+template<>
+inline
+void cl::args::push_back<cl::image_with_mipmaps>(cl::image_with_mipmaps& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;

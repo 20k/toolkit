@@ -455,6 +455,68 @@ void cl::image::write_impl(command_queue& write_on, const char* ptr, const vec<3
     }
 }
 
+
+cl::image_with_mipmaps::image_with_mipmaps(cl::context& ctx)
+{
+    native_context = ctx.native_context;
+}
+
+void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, int mip_levels, const cl_image_format& format)
+{
+    cl_image_desc desc = {0};
+    desc.image_width = 1;
+    desc.image_height = 1;
+    desc.image_depth = 1;
+    desc.num_mip_levels = mip_levels;
+
+    if(dims == 1)
+    {
+        desc.image_type = CL_MEM_OBJECT_IMAGE1D;
+        desc.image_width = _sizes[0];
+    }
+
+    if(dims == 2)
+    {
+        desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+        desc.image_width = _sizes[0];
+        desc.image_height = _sizes[1];
+    }
+
+    if(dims == 3)
+    {
+        desc.image_type = CL_MEM_OBJECT_IMAGE3D;
+        desc.image_width = _sizes[0];
+        desc.image_height = _sizes[1];
+        desc.image_depth = _sizes[2];
+    }
+
+    cl_int err;
+    cl_mem ret = clCreateImage(native_context.data, CL_MEM_READ_WRITE, &format, &desc, nullptr, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not clCreateImage");
+    }
+
+    dimensions = dims;
+    sizes = _sizes;
+    native_mem_object.data = ret;
+}
+
+void cl::image_with_mipmaps::write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level)
+{
+    vec<4, size_t> lorigin = {origin.x(), origin.y(), origin.z(), 1};
+
+    lorigin.v[dimensions] = mip_level;
+
+    cl_int err = clEnqueueWriteImage(write_on.native_command_queue.data, native_mem_object.data, true, &lorigin.v[0], &region.v[0], 0, 0, ptr, 0, nullptr, nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not write to image " + std::to_string(err));
+    }
+}
+
 cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : kernels(ctx.kernels)
 {
     cl_int err;
@@ -644,6 +706,25 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
 
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, _texture_id, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "Failure in create from rendertexture " << err << std::endl;
+        throw std::runtime_error("Failure in create_from rendertexture");
+    }
+
+    texture_id = _texture_id;
+    native_mem_object.data = cmem;
+}
+
+///unfortunately, this does not support -1 which would have been superhumanly useful
+void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, int mip_level)
+{
+    ///Do I need this?
+    glBindTexture(GL_TEXTURE_2D, _texture_id);
+
+    cl_int err;
+    cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, mip_level, _texture_id, &err);
 
     if(err != CL_SUCCESS)
     {
