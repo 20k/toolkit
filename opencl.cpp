@@ -94,6 +94,14 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
     }
 }
 
+void cl::event::block()
+{
+    if(native_event.data == nullptr)
+        return;
+
+    clWaitForEvents(1, &native_event.data);
+}
+
 cl::kernel::kernel()
 {
 
@@ -588,6 +596,11 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
 void cl::command_queue::block()
 {
     clFinish(native_command_queue.data);
+}
+
+void cl::command_queue::flush()
+{
+    clFlush(native_command_queue.data);
 }
 
 cl::gl_rendertexture::gl_rendertexture(context& ctx)

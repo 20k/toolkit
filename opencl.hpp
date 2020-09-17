@@ -109,6 +109,8 @@ namespace cl
     struct event
     {
         base<cl_event, clRetainEvent, clReleaseEvent> native_event;
+
+        void block();
     };
 
     struct program;
@@ -283,6 +285,7 @@ namespace cl
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
         void block();
+        void flush();
 
     protected:
         command_queue();
