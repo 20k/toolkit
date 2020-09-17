@@ -203,6 +203,42 @@ namespace cl
     {
         void clear(cl::command_queue& cqueue);
         std::array<int64_t, 3> sizes = {1, 1, 1};
+
+        template<int N, typename T>
+        std::vector<T> read(cl::command_queue& cqueue, const vec<N, size_t>& origin, const vec<N, size_t>& region)
+        {
+            vec<3, size_t> lorigin = {0,0,0};
+            vec<3, size_t> lregion = {1,1,1};
+
+            for(int i=0; i < N; i++)
+            {
+                lorigin.v[i] = origin.v[i];
+                lregion.v[i] = region.v[i];
+            }
+
+            std::vector<T> ret;
+
+            int elements = 1;
+
+            for(int i=0; i < N; i++)
+            {
+                elements *= region.v[i];
+            }
+
+            ret.resize(elements);
+
+            if(ret.size() == 0)
+                return ret;
+
+            cl_int err = clEnqueueReadImage(cqueue.native_command_queue.data, native_mem_object.data, CL_TRUE, &lorigin.v[0], &lregion.v[0], 0, 0, &ret[0], 0, nullptr, nullptr);
+
+            if(err != CL_SUCCESS)
+            {
+                throw std::runtime_error("Could not read image");
+            }
+
+            return ret;
+        }
     };
 
     struct image : image_base
