@@ -204,11 +204,13 @@ namespace cl
         void clear(cl::command_queue& cqueue);
         std::array<int64_t, 3> sizes = {1, 1, 1};
 
+        void read_impl(cl::command_queue& cqueue, const vec<4, size_t>& origin, const vec<4, size_t>& region, char* out);
+
         template<int N, typename T>
         std::vector<T> read(cl::command_queue& cqueue, const vec<N, size_t>& origin, const vec<N, size_t>& region)
         {
-            vec<3, size_t> lorigin = {0,0,0};
-            vec<3, size_t> lregion = {1,1,1};
+            vec<4, size_t> lorigin = {0,0,0,0};
+            vec<4, size_t> lregion = {1,1,1,1};
 
             for(int i=0; i < N; i++)
             {
@@ -230,12 +232,7 @@ namespace cl
             if(ret.size() == 0)
                 return ret;
 
-            cl_int err = clEnqueueReadImage(cqueue.native_command_queue.data, native_mem_object.data, CL_TRUE, &lorigin.v[0], &lregion.v[0], 0, 0, &ret[0], 0, nullptr, nullptr);
-
-            if(err != CL_SUCCESS)
-            {
-                throw std::runtime_error("Could not read image");
-            }
+            read_impl(cqueue, lorigin, lregion, (char*)&ret[0]);
 
             return ret;
         }
