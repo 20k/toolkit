@@ -62,7 +62,7 @@ file::manual_fs_sync::~manual_fs_sync()
 
 std::string file::read(const std::string& file, file::mode::type m)
 {
-    const char* fmode = m == file::mode::BINARY ? "rb" : "r";
+    const char* fmode = (m == file::mode::BINARY) ? "rb" : "r";
 
     #ifndef __EMSCRIPTEN__
     FILE* f = fopen(file.c_str(), fmode);
@@ -70,15 +70,25 @@ std::string file::read(const std::string& file, file::mode::type m)
     FILE* f = fopen(("web/" + file).c_str(), fmode);
     #endif
 
+    if(f == nullptr)
+        return "";
+
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
 
+    if(fsize == -1L)
+    {
+        fclose(f);
+        return "";
+    }
+
     std::string buffer;
-    buffer.resize(fsize + 1);
-    fread(&buffer[0], fsize, 1, f);
-    fclose(f);
     buffer.resize(fsize);
+    size_t real = fread(buffer.data(), 1, fsize, f);
+    buffer.resize(real);
+
+    fclose(f);
 
     return buffer;
 }
@@ -250,6 +260,15 @@ void file::rename(const std::string& from, const std::string& to)
     #endif
 
     sync_writes(); //?
+}
+
+bool file::remove(const std::string& name)
+{
+    #ifndef __EMSCRIPTEN__
+    return ::remove(name.c_str()) == 0;
+    #else
+    return ::remove(("web/" + name).c_str()) == 0;
+    #endif
 }
 
 #ifdef __EMSCRIPTEN__

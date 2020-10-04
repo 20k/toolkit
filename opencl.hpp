@@ -109,6 +109,8 @@ namespace cl
     struct event
     {
         base<cl_event, clRetainEvent, clReleaseEvent> native_event;
+
+        void block();
     };
 
     struct program;
@@ -175,7 +177,11 @@ namespace cl
             write(write_on, (const char*)&data[0], data.size() * sizeof(T));
         }
 
+        void write_async(command_queue& write_on, const char* ptr, int64_t bytes);
+
         void read(command_queue& read_on, char* ptr, int64_t bytes);
+
+        void set_to_zero(command_queue& write_on);
 
         template<typename T>
         std::vector<T> read(command_queue& read_on)
@@ -197,6 +203,39 @@ namespace cl
     {
         void clear(cl::command_queue& cqueue);
         std::array<int64_t, 3> sizes = {1, 1, 1};
+
+        void read_impl(cl::command_queue& cqueue, const vec<4, size_t>& origin, const vec<4, size_t>& region, char* out);
+
+        template<int N, typename T>
+        std::vector<T> read(cl::command_queue& cqueue, const vec<N, size_t>& origin, const vec<N, size_t>& region)
+        {
+            vec<4, size_t> lorigin = {0,0,0,0};
+            vec<4, size_t> lregion = {1,1,1,1};
+
+            for(int i=0; i < N; i++)
+            {
+                lorigin.v[i] = origin.v[i];
+                lregion.v[i] = region.v[i];
+            }
+
+            std::vector<T> ret;
+
+            int elements = 1;
+
+            for(int i=0; i < N; i++)
+            {
+                elements *= region.v[i];
+            }
+
+            ret.resize(elements);
+
+            if(ret.size() == 0)
+                return ret;
+
+            read_impl(cqueue, lorigin, lregion, (char*)&ret[0]);
+
+            return ret;
+        }
     };
 
     struct image : image_base
@@ -241,9 +280,24 @@ namespace cl
             return alloc_impl(init.size(), storage, format);
         }
 
-        /*void write(command_queue& write_on, const char* ptr, int64_t bytes);
+        void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region);
 
-        template<typename T>
+        template<int N>
+        void write(command_queue& write_on, const char* ptr, const vec<N, size_t>& origin, const vec<N, size_t>& region)
+        {
+            vec<3, size_t> forigin;
+            vec<3, size_t> fregion = {1,1,1};
+
+            for(int i=0; i < N && i < 3; i++)
+            {
+                forigin.v[i] = origin.v[i];
+                fregion.v[i] = region.v[i];
+            }
+
+            write_impl(write_on, ptr, forigin, fregion);
+        }
+
+        /*template<typename T>
         void write(command_queue& write_on, const std::vector<T>& data)
         {
             if(data.size() == 0)
@@ -251,6 +305,48 @@ namespace cl
 
             write(write_on, (const char*)&data[0], data.size() * sizeof(T));
         }*/
+    };
+
+
+    struct image_with_mipmaps : image_base
+    {
+        base<cl_context, clRetainContext, clReleaseContext> native_context;
+
+        int dimensions = 1;
+
+        image_with_mipmaps(cl::context& ctx);
+
+        void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, int mip_levels, const cl_image_format& format);
+
+        template<int N>
+        void alloc(const vec<N, int>& in_dims, int mip_levels, const cl_image_format& format)
+        {
+            static_assert(N > 0 && N <= 3);
+
+            std::array<int64_t, 3> storage = {1,1,1};
+
+            for(int i=0; i < N; i++)
+                storage[i] = in_dims.v[i];
+
+            return alloc_impl(N, storage, mip_levels, format);
+        }
+
+        void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level);
+
+        template<int N>
+        void write(command_queue& write_on, const char* ptr, const vec<N, size_t>& origin, const vec<N, size_t>& region, int mip_level)
+        {
+            vec<3, size_t> forigin;
+            vec<3, size_t> fregion = {1,1,1};
+
+            for(int i=0; i < N && i < 3; i++)
+            {
+                forigin.v[i] = origin.v[i];
+                fregion.v[i] = region.v[i];
+            }
+
+            write_impl(write_on, ptr, forigin, fregion, mip_level);
+        }
     };
 
     struct command_queue
@@ -261,8 +357,18 @@ namespace cl
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 
-        void exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
+        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
+        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
         void block();
+        void flush();
+
+    protected:
+        command_queue();
+    };
+
+    struct device_command_queue : command_queue
+    {
+        device_command_queue(context& ctx, cl_command_queue_properties props = 0);
     };
 
     struct gl_rendertexture : image_base
@@ -276,6 +382,7 @@ namespace cl
 
         void create(int w, int h);
         void create_from_texture(GLuint texture_id);
+        void create_from_texture_with_mipmaps(GLuint texture_id, int mip_level);
         void create_from_framebuffer(GLuint framebuffer_id);
 
         void acquire(command_queue& cqueue);
@@ -337,6 +444,8 @@ namespace cl
         clEnqueueCopyImage(cqueue.native_command_queue.data, i1.native_mem_object.data, i2.native_mem_object.data, src, src, iregion, 0, nullptr, nullptr);
     }
 
+    bool supports_extension(context& ctx, const std::string& name);
+
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
 }
 
@@ -376,6 +485,17 @@ void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
 template<>
 inline
 void cl::args::push_back<cl::image>(cl::image& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_mem_object.data;
+    inf.size = sizeof(cl_mem);
+
+    arg_list.push_back(inf);
+}
+
+template<>
+inline
+void cl::args::push_back<cl::image_with_mipmaps>(cl::image_with_mipmaps& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;

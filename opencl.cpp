@@ -94,6 +94,14 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
     }
 }
 
+void cl::event::block()
+{
+    if(native_event.data == nullptr)
+        return;
+
+    clWaitForEvents(1, &native_event.data);
+}
+
 cl::kernel::kernel()
 {
 
@@ -319,6 +327,34 @@ void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t byt
     }
 }
 
+void event_memory_free(cl_event event, cl_int event_command_status, void* user_data)
+{
+    if(event_command_status != CL_COMPLETE)
+        return;
+
+    delete [] (char*)user_data;
+}
+
+void cl::buffer::write_async(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+{
+    assert(bytes <= alloc_size);
+
+    cl_event evt;
+
+    char* nptr = new char[bytes];
+
+    memcpy(nptr, ptr, bytes);
+
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, nptr, 0, nullptr, &evt);
+
+    clSetEventCallback(evt, CL_COMPLETE, &event_memory_free, nptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not write");
+    }
+}
+
 void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
 {
     assert(bytes <= alloc_size);
@@ -328,6 +364,18 @@ void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not read");
+    }
+}
+
+void cl::buffer::set_to_zero(cl::command_queue& write_on)
+{
+    static int zero = 0;
+
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, (const void*)&zero, 1, 0, alloc_size, 0, nullptr, nullptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not set_to_zero");
     }
 }
 
@@ -397,10 +445,87 @@ void cl::image_base::clear(cl::command_queue& cqueue)
     }
 }
 
-/*void cl::image::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+void cl::image_base::read_impl(cl::command_queue& cqueue, const vec<4, size_t>& origin, const vec<4, size_t>& region, char* out)
 {
-    size_t origin =
-}*/
+    cl_int err = clEnqueueReadImage(cqueue.native_command_queue.data, native_mem_object.data, CL_TRUE, &origin.v[0], &region.v[0], 0, 0, out, 0, nullptr, nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not read image");
+    }
+}
+
+void cl::image::write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region)
+{
+    cl_int err = clEnqueueWriteImage(write_on.native_command_queue.data, native_mem_object.data, true, &origin.v[0], &region.v[0], 0, 0, ptr, 0, nullptr, nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not write to image " + std::to_string(err));
+    }
+}
+
+
+cl::image_with_mipmaps::image_with_mipmaps(cl::context& ctx)
+{
+    native_context = ctx.native_context;
+}
+
+void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, int mip_levels, const cl_image_format& format)
+{
+    cl_image_desc desc = {0};
+    desc.image_width = 1;
+    desc.image_height = 1;
+    desc.image_depth = 1;
+    desc.num_mip_levels = mip_levels;
+
+    if(dims == 1)
+    {
+        desc.image_type = CL_MEM_OBJECT_IMAGE1D;
+        desc.image_width = _sizes[0];
+    }
+
+    if(dims == 2)
+    {
+        desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+        desc.image_width = _sizes[0];
+        desc.image_height = _sizes[1];
+    }
+
+    if(dims == 3)
+    {
+        desc.image_type = CL_MEM_OBJECT_IMAGE3D;
+        desc.image_width = _sizes[0];
+        desc.image_height = _sizes[1];
+        desc.image_depth = _sizes[2];
+    }
+
+    cl_int err;
+    cl_mem ret = clCreateImage(native_context.data, CL_MEM_READ_WRITE, &format, &desc, nullptr, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not clCreateImage");
+    }
+
+    dimensions = dims;
+    sizes = _sizes;
+    native_mem_object.data = ret;
+}
+
+void cl::image_with_mipmaps::write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level)
+{
+    vec<4, size_t> lorigin = {origin.x(), origin.y(), origin.z(), 1};
+
+    lorigin.v[dimensions] = mip_level;
+
+    cl_int err = clEnqueueWriteImage(write_on.native_command_queue.data, native_mem_object.data, true, &lorigin.v[0], &region.v[0], 0, 0, ptr, 0, nullptr, nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not write to image " + std::to_string(err));
+    }
+}
 
 cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : kernels(ctx.kernels)
 {
@@ -423,8 +548,38 @@ cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties p
     native_context = ctx.native_context;
 }
 
-void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
+cl::command_queue::command_queue()
 {
+
+}
+
+cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queue_properties props)
+{
+    cl_int err;
+
+    kernels = ctx.kernels;
+
+    cl_queue_properties qprop[] = { CL_QUEUE_SIZE, 4096, CL_QUEUE_PROPERTIES,
+     (cl_command_queue_properties)(CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE |
+                                   CL_QUEUE_ON_DEVICE |
+                                   CL_QUEUE_ON_DEVICE_DEFAULT), 0 };
+
+    cl_command_queue cqueue = clCreateCommandQueueWithProperties(ctx.native_context.data, ctx.selected_device, qprop, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "Error creating command queue " << err << std::endl;
+        throw std::runtime_error("Could not make command queue");
+    }
+
+    native_command_queue.data = cqueue;
+    native_context = ctx.native_context;
+}
+
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+{
+    cl::event ret;
+
     assert(global_ws.size() == local_ws.size());
 
     auto kernel_it = kernels->find(kname);
@@ -466,32 +621,32 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
         }
     }
 
+    static_assert(sizeof(cl::event) == sizeof(cl_event));
+
     cl_int err = CL_SUCCESS;
 
     #ifndef GPU_PROFILE
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, nullptr);
+    if(deps.size() > 0)
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
+    else
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
     #else
 
-    cl_event local;
-
-    if(out == nullptr)
-        out = &local;
-
-    err = clEnqueueNDRangeKernel(native_command_queue.data, kname.get(), dim, nullptr, g_ws, l_ws, 0, nullptr, out);
+    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
 
     cl_ulong start;
     cl_ulong finish;
 
     block();
 
-    clGetEventProfilingInfo(*out, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
-    clGetEventProfilingInfo(*out, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
 
     cl_ulong diff = finish - start;
 
     double ddiff = diff / 1000. / 1000.;
 
-    std::cout << "kernel " << kname.name << " ms " << ddiff << std::endl;
+    std::cout << "kernel " << kname << " ms " << ddiff << std::endl;
 
     #endif // GPU_PROFILE
 
@@ -499,11 +654,25 @@ void cl::command_queue::exec(const std::string& kname, cl::args& pack, const std
     {
         std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kname << std::endl;
     }
+
+    return ret;
+}
+
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
+{
+    std::vector<cl::event> evts;
+
+    return exec(kname, pack, global_ws, local_ws, evts);
 }
 
 void cl::command_queue::block()
 {
     clFinish(native_command_queue.data);
+}
+
+void cl::command_queue::flush()
+{
+    clFlush(native_command_queue.data);
 }
 
 cl::gl_rendertexture::gl_rendertexture(context& ctx)
@@ -547,6 +716,25 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
 
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, _texture_id, &err);
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "Failure in create from rendertexture " << err << std::endl;
+        throw std::runtime_error("Failure in create_from rendertexture");
+    }
+
+    texture_id = _texture_id;
+    native_mem_object.data = cmem;
+}
+
+///unfortunately, this does not support -1 which would have been superhumanly useful
+void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, int mip_level)
+{
+    ///Do I need this?
+    glBindTexture(GL_TEXTURE_2D, _texture_id);
+
+    cl_int err;
+    cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, mip_level, _texture_id, &err);
 
     if(err != CL_SUCCESS)
     {
@@ -617,6 +805,32 @@ void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
     {
         throw std::runtime_error("Could not copy buffers");
     }
+}
+
+bool cl::supports_extension(cl::context& ctx, const std::string& name)
+{
+    size_t arr_size = 0;
+    cl_int err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, 0, nullptr, &arr_size);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Error in clGetDeviceInfo");
+    }
+
+    if(arr_size == 0)
+        return false;
+
+    std::string extensions;
+    extensions.resize(arr_size + 1);
+
+    err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, arr_size, &extensions[0], nullptr);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Error in clGetDeviceInfo");
+    }
+
+    return extensions.find(name) != std::string::npos;
 }
 
 #endif // NO_OPENCL

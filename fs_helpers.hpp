@@ -27,6 +27,7 @@ namespace file
     void write_atomic(const std::string& file, const std::string& data, mode::type m);
     bool exists(const std::string& name);
     void rename(const std::string& from, const std::string& to);
+    bool remove(const std::string& name);
 
     #ifdef __EMSCRIPTEN__
     // EMSCRIPTEN ONLY OBVIOUSLY
