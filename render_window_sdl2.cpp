@@ -11,11 +11,8 @@
 #include <map>
 #include <iostream>
 #include <toolkit/fs_helpers.hpp>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_video.h>
+#include <SDL.h>
 #include "clock.hpp"
-#include <SFML/System/Sleep.hpp>
-#include <windows.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -24,6 +21,7 @@
 
 #ifndef __EMSCRIPTEN__
 #include <filesystem>
+#include <windows.h>
 #endif // __EMSCRIPTEN__
 
 namespace
@@ -71,6 +69,13 @@ sdl2_render_context::sdl2_render_context(const render_settings& sett, const std:
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+    #elif defined(__EMSCRIPTEN__)
+    const char* glsl_version = "#version 100";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    //SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    printf("Emscripten init\n");
     #else
     // GL 3.0 + GLSL 130
     const char* glsl_version = "#version 130";
@@ -254,14 +259,14 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             break;
         }
         #else
-        if(first)
+        /*if(first)
         {
             int res = SDL_WaitEventTimeout(&e, maximum_sleep_s * 1000);
 
             if(res == 0)
                 break;
         }
-        else
+        else*/
         {
             int res = SDL_PollEvent(&e);
 
@@ -285,7 +290,11 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             std::string data = file::read(name, file::mode::TEXT);
 
             dropped_file fle;
-            fle.name = std::filesystem::path(name).filename().string();
+            fle.name = name;
+
+            std::cout << "Dropped file " << name << std::endl;
+
+            //fle.name = std::filesystem::path(name).filename().string();
             fle.data = data;
 
             dropped.push_back(fle);

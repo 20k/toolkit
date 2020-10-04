@@ -210,7 +210,7 @@ render_window::render_window(render_settings sett, generic_backend* _backend)
     #ifdef __EMSCRIPTEN__
     ImGui::GetIO().IniFilename = "web/imgui.ini";
 
-    drag_drop_init();
+    //drag_drop_init();
     #endif // __EMSCRIPTEN__
 }
 
@@ -247,7 +247,7 @@ render_window::render_window(render_settings sett, const std::string& window_tit
     #ifdef __EMSCRIPTEN__
     ImGui::GetIO().IniFilename = "web/imgui.ini";
 
-    drag_drop_init();
+    //drag_drop_init();
     #endif // __EMSCRIPTEN__
 }
 
