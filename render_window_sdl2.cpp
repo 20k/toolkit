@@ -13,6 +13,9 @@
 #include <toolkit/fs_helpers.hpp>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_video.h>
+#include "clock.hpp"
+#include <SFML/System/Sleep.hpp>
+#include <windows.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -240,6 +243,17 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
     {
         SDL_Event e;
 
+        #ifndef __EMSCRIPTEN__
+        int res = SDL_PollEvent(&e);
+
+        if(res == 0)
+        {
+            if(maximum_sleep_s != 0)
+                MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD) (maximum_sleep_s * 1e3), QS_ALLEVENTS);
+
+            break;
+        }
+        #else
         if(first)
         {
             int res = SDL_WaitEventTimeout(&e, maximum_sleep_s * 1000);
@@ -254,6 +268,7 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             if(res == 0)
                 break;
         }
+        #endif
 
         ImGui_ImplSDL2_ProcessEvent(&e);
 
