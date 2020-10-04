@@ -71,6 +71,79 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
 }
 #endif // __EMSCRIPTEN__
 
+#ifdef __EMSCRIPTEN__
+EM_JS(int, num_dropped_files, (),
+{
+    return Module.dropped.length;
+});
+
+EM_JS(int, dropped_array_member_length, (int idx, int member),
+{
+    return Module.dropped[idx][member].length;
+});
+
+EM_JS(void, dropped_array_member, (int idx, int member, char* out),
+{
+    var member = Module.dropped[idx][member];
+
+    stringToUTF8(member, out, member.length+1);
+});
+
+EM_JS(void, clear_dropped, (),
+{
+    Module.dropped = [];
+});
+
+EM_JS(void, drag_drop_init, (),
+{
+    Module.dropped = [];
+
+    function dragenter(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+
+    function dragover(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+
+    function drop(e)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const dt = e.dataTransfer;
+        const all_files = dt.files;
+
+        for(var i=0; i < all_files.length; i++)
+        {
+            const file = all_files[i];
+
+            var read = new FileReader();
+
+            read.readAsBinaryString(file);
+
+            read.onloadend = function()
+            {
+                Module.dropped.push([file.name, read.result]);
+                console.log(Module.dropped[Module.dropped.length-1]);
+            }
+        }
+    }
+
+    let elem = document.getElementById("canvas");
+    elem.addEventListener("dragenter", dragenter, false);
+    elem.addEventListener("dragover", dragover, false);
+    elem.addEventListener("drop", drop, false);
+
+    console.log("registered");
+});
+#endif // __EMSCRIPTEN__
+
+
 void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 {
     int wx = dim.x();
@@ -97,8 +170,21 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
 }
 
-glfw_render_context::glfw_render_context(const render_settings& sett, const std::string& window_title)
+glfw_render_context::glfw_render_context(const render_settings& lsett, const std::string& window_title)
 {
+    render_settings sett = lsett;
+
+    #ifdef __EMSCRIPTEN__
+    double width, height;
+    emscripten_get_element_css_size("canvas", &width, &height);
+    emscripten_set_canvas_size(int(width), int(height));
+
+    sett.width = width;
+    sett.height = height;
+    sett.viewports = false;
+    sett.is_srgb = false;
+    #endif // __EMSCRIPTEN__
+
     glfwSetErrorCallback(glfw_error_callback);
 
     if(!glfwInit())
@@ -205,6 +291,10 @@ glfw_backend::glfw_backend(const render_settings& sett, const std::string& windo
     if(sett.opencl)
         clctx = new opencl_context();
     #endif // NO_OPENCL
+
+    #ifdef __EMSCRIPTEN__
+    drag_drop_init();
+    #endif // __EMSCRIPTEN__
 }
 
 void glfw_backend::init_screen(vec2i dim)
@@ -273,78 +363,6 @@ void check_resize_emscripten(glfw_backend& b)
 
     b.resize(dim);
 }
-#endif // __EMSCRIPTEN__
-
-#ifdef __EMSCRIPTEN__
-EM_JS(int, num_dropped_files, (),
-{
-    return Module.dropped.length;
-});
-
-EM_JS(int, dropped_array_member_length, (int idx, int member),
-{
-    return Module.dropped[idx][member].length;
-});
-
-EM_JS(void, dropped_array_member, (int idx, int member, char* out),
-{
-    var member = Module.dropped[idx][member];
-
-    stringToUTF8(member, out, member.length+1);
-});
-
-EM_JS(void, clear_dropped, (),
-{
-    Module.dropped = [];
-});
-
-EM_JS(void, drag_drop_init, (),
-{
-    Module.dropped = [];
-
-    function dragenter(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-    }
-
-    function dragover(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-    }
-
-    function drop(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-
-        const dt = e.dataTransfer;
-        const all_files = dt.files;
-
-        for(var i=0; i < all_files.length; i++)
-        {
-            const file = all_files[i];
-
-            var read = new FileReader();
-
-            read.readAsBinaryString(file);
-
-            read.onloadend = function()
-            {
-                Module.dropped.push([file.name, read.result]);
-                console.log(Module.dropped[Module.dropped.length-1]);
-            }
-        }
-    }
-
-    let elem = document.getElementById("canvas");
-    elem.addEventListener("dragenter", dragenter, false);
-    elem.addEventListener("dragover", dragover, false);
-    elem.addEventListener("drop", drop, false);
-
-    console.log("registered");
-});
 #endif // __EMSCRIPTEN__
 
 std::string fixup_string(std::string in)
