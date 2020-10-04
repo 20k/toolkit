@@ -165,6 +165,8 @@ glfw_render_context::glfw_render_context(const render_settings& sett, const std:
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+    printf("ImGui finished creation\n");
 }
 
 glfw_render_context::~glfw_render_context()
@@ -178,20 +180,18 @@ glfw_render_context::~glfw_render_context()
 }
 
 #ifdef __EMSCRIPTEN__
-EM_BOOL on_emscripten_resize(int eventType, const EmscriptenUiEvent *uiEvent, void *userData)
+void check_resize_emscripten(glfw_backend& b)
 {
-    if(eventType == EMSCRIPTEN_EVENT_RESIZE)
-    {
-        glfw_backend& b = *(glfw_backend*)userData;
+    double width, height;
+    emscripten_get_element_css_size("canvas", &width, &height);
+    emscripten_set_canvas_size((int)width, (int)height);
 
-        vec2i dim = {uiEvent->windowInnerWidth, uiEvent->windowInnerHeight};
+    if(width == b.get_window_size().x() && height == b.get_window_size().y())
+        return;
 
-        b.resize(dim);
+    vec2i dim = {width, height};
 
-        return false;
-    }
-
-    return false;
+    b.resize(dim);
 }
 #endif // __EMSCRIPTEN__
 
@@ -214,10 +214,6 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
 
 glfw_backend::glfw_backend(const render_settings& sett, const std::string& window_title) : ctx(sett, window_title)
 {
-    #ifdef __EMSCRIPTEN__
-    emscripten_set_resize_callback(nullptr, (void*)this, false, on_emscripten_resize);
-    #endif // __EMSCRIPTEN__
-
     #ifndef __EMSCRIPTEN__
     glfwSetDropCallback(ctx.window, drop_callback);
     #endif // __EMSCRIPTEN__
@@ -381,6 +377,10 @@ void glfw_backend::poll_events_only(double maximum_sleep_s)
     assert(ctx.window);
 
     glfwWaitEventsTimeout(maximum_sleep_s);
+
+    #ifdef __EMSCRIPTEN__
+    check_resize_emscripten(*this);
+    #endif // __EMSCRIPTEN__
 
     if(glfwWindowShouldClose(ctx.window))
         closing = true;
