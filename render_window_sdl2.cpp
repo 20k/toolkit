@@ -61,12 +61,27 @@ sdl2_render_context::sdl2_render_context(const render_settings& sett, const std:
         SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1);
     }
 
-    window = SDL_CreateWindow(window_title.c_str(), 0, 0, sett.width, sett.height, SDL_WINDOW_OPENGL);
+    #ifdef __APPLE__
+    // GL 3.2 Core + GLSL 150
+    const char* glsl_version = "#version 150";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+    #else
+    // GL 3.0 + GLSL 130
+    const char* glsl_version = "#version 130";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    #endif
 
-    if(sett.no_decoration)
-    {
-        SDL_SetWindowBordered(window, (SDL_bool)true);
-    }
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+
+    window = SDL_CreateWindow(window_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, sett.width, sett.height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
     if(window == nullptr)
     {
@@ -76,8 +91,15 @@ sdl2_render_context::sdl2_render_context(const render_settings& sett, const std:
 
     glcontext = SDL_GL_CreateContext(window);
 
+    SDL_GL_MakeCurrent(window, glcontext);
+
     if(glewInit() != GLEW_OK)
         throw std::runtime_error("Bad Glew");
+
+    if(sett.no_decoration)
+    {
+        SDL_SetWindowBordered(window, SDL_FALSE);
+    }
 
     ImGui::CreateContext(&atlas);
 
@@ -112,12 +134,6 @@ sdl2_render_context::sdl2_render_context(const render_settings& sett, const std:
     io.Fonts->AddFontDefault();
 
     ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1);
-
-    #ifndef __EMSCRIPTEN__
-    const char* glsl_version = "#version 130";
-    #else
-    const char* glsl_version = "#version 100";
-    #endif
 
     ImGui_ImplSDL2_InitForOpenGL(window, glcontext);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -239,6 +255,8 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
                 break;
         }
 
+        ImGui_ImplSDL2_ProcessEvent(&e);
+
         if(e.type == SDL_QUIT)
         {
             closing = true;
@@ -258,7 +276,7 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             dropped.push_back(fle);
         }
 
-        if(e.type == SDL_WINDOWEVENT)
+        if(e.type == SDL_WINDOWEVENT && e.window.windowID == SDL_GetWindowID(ctx.window))
         {
             if(e.window.event == SDL_WINDOWEVENT_CLOSE)
                 closing = true;
