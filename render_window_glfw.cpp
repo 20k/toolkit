@@ -463,7 +463,6 @@ void glfw_backend::poll(double maximum_sleep_s)
     poll_issue_new_frame_only();
 }
 
-
 void glfw_backend::display()
 {
     assert(ctx.window);
