@@ -437,6 +437,109 @@ void sdl2_backend::resize(vec2i dim)
     init_screen(dim);
 }
 
+std::string sdl2_backend::get_key_name(int key_id)
+{
+    std::map<int, std::string> key_map;
+
+    key_map[SDLK_RETURN] = "return";
+    key_map[SDLK_BACKSPACE] = "backspace";
+    key_map[SDLK_DELETE] = "delete";
+    key_map[SDLK_INSERT] = "insert";
+    key_map[SDLK_TAB] = "tab";
+
+    key_map[SDLK_UP] = "up";
+    key_map[SDLK_DOWN] = "down";
+    key_map[SDLK_LEFT] = "left";
+    key_map[SDLK_RIGHT] = "right";
+    key_map[SDLK_HOME] = "home";
+    key_map[SDLK_END] = "end";
+    key_map[SDLK_PAGEUP] = "pageup";
+    key_map[SDLK_PAGEDOWN] = "pagedown";
+    key_map[SDLK_LSHIFT] = "lshift";
+    key_map[SDLK_RSHIFT] = "rshift";
+    key_map[SDLK_LCTRL] = "lctrl";
+    key_map[SDLK_RCTRL] = "rctrl";
+    key_map[SDLK_LALT] = "lalt";
+    key_map[SDLK_RALT] = "ralt";
+    key_map[SDLK_ESCAPE] = "escape";
+
+    key_map[SDLK_QUOTE] = "'";
+    key_map[SDLK_COMMA] = ",";
+    key_map[SDLK_MINUS] = "-";
+    key_map[SDLK_PERIOD] = ".";
+    key_map[SDLK_SLASH] = "/";
+    key_map[SDLK_SEMICOLON] = ";";
+    key_map[SDLK_EQUALS] = "=";
+    key_map[SDLK_LEFTBRACKET] = "[";
+    key_map[SDLK_RIGHTBRACKET] = "]";
+    key_map[SDLK_BACKSLASH] = "\\";
+    key_map[SDLK_0] = "0";
+    key_map[SDLK_1] = "1";
+    key_map[SDLK_2] = "2";
+    key_map[SDLK_3] = "3";
+    key_map[SDLK_4] = "4";
+    key_map[SDLK_5] = "5";
+    key_map[SDLK_6] = "6";
+    key_map[SDLK_7] = "7";
+    key_map[SDLK_8] = "8";
+    key_map[SDLK_9] = "9";
+
+    key_map[SDLK_a] = "a";
+    key_map[SDLK_b] = "b";
+    key_map[SDLK_c] = "c";
+    key_map[SDLK_d] = "d";
+    key_map[SDLK_e] = "e";
+    key_map[SDLK_f] = "f";
+    key_map[SDLK_g] = "g";
+    key_map[SDLK_h] = "h";
+    key_map[SDLK_i] = "i";
+    key_map[SDLK_j] = "j";
+    key_map[SDLK_k] = "k";
+    key_map[SDLK_l] = "l";
+    key_map[SDLK_m] = "m";
+    key_map[SDLK_n] = "n";
+    key_map[SDLK_o] = "o";
+    key_map[SDLK_p] = "p";
+    key_map[SDLK_q] = "q";
+    key_map[SDLK_r] = "r";
+    key_map[SDLK_s] = "s";
+    key_map[SDLK_t] = "t";
+    key_map[SDLK_u] = "u";
+    key_map[SDLK_v] = "v";
+    key_map[SDLK_w] = "w";
+    key_map[SDLK_x] = "x";
+    key_map[SDLK_y] = "y";
+    key_map[SDLK_z] = "z";
+
+    key_map[SDLK_KP_0] = "kp0";
+    key_map[SDLK_KP_1] = "kp1";
+    key_map[SDLK_KP_2] = "kp2";
+    key_map[SDLK_KP_3] = "kp3";
+    key_map[SDLK_KP_4] = "kp4";
+    key_map[SDLK_KP_5] = "kp5";
+    key_map[SDLK_KP_6] = "kp6";
+    key_map[SDLK_KP_7] = "kp7";
+    key_map[SDLK_KP_8] = "kp8";
+    key_map[SDLK_KP_9] = "kp9";
+
+    key_map[SDLK_KP_DECIMAL] = "kp.";
+    key_map[SDLK_KP_DIVIDE] = "kp/";
+    key_map[SDLK_KP_MULTIPLY] = "kp*";
+    key_map[SDLK_KP_MINUS] = "kp-";
+    key_map[SDLK_KP_PLUS] = "kp+";
+    key_map[SDLK_KP_EQUALS] = "kp=";
+    key_map[SDLK_KP_ENTER] = "kpenter";
+
+    key_map[SDLK_KP_SPACE] = "space";
+
+    auto it = key_map.find(key_id);
+
+    if(it == key_map.end())
+        return "";
+    else
+        return it->second;
+}
+
 bool sdl2_backend::has_dropped_file()
 {
     return dropped.size() > 0;

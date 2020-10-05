@@ -22,7 +22,6 @@ struct sdl2_render_context
     void init_screen(vec2i dim);
 };
 
-
 struct sdl2_backend : generic_backend
 {
     sdl2_render_context ctx;
@@ -46,6 +45,7 @@ struct sdl2_backend : generic_backend
     vec2i get_window_position() override;
     void set_window_position(vec2i position) override;
     void resize(vec2i dim) override;
+    std::string get_key_name(int key_id) override;
 
     bool has_dropped_file() override;
     dropped_file get_next_dropped_file() override;
