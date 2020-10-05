@@ -54,6 +54,7 @@ struct sdl2_backend : generic_backend
 private:
     bool closing = false;
     std::vector<dropped_file> dropped;
+    vec2i last_size;
 };
 
 

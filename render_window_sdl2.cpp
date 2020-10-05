@@ -53,8 +53,21 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 }
 }
 
-sdl2_render_context::sdl2_render_context(const render_settings& sett, const std::string& window_title)
+sdl2_render_context::sdl2_render_context(const render_settings& lsett, const std::string& window_title)
 {
+    render_settings sett = lsett;
+
+    #ifdef __EMSCRIPTEN__
+    double width, height;
+    emscripten_get_element_css_size("canvas", &width, &height);
+    emscripten_set_canvas_size(int(width), int(height));
+
+    sett.width = width;
+    sett.height = height;
+    sett.viewports = false;
+    sett.is_srgb = false;
+    #endif // __EMSCRIPTEN__
+
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
     if(sett.is_srgb)
@@ -220,6 +233,19 @@ void sdl2_backend::set_window_position(vec2i pos)
     SDL_SetWindowPosition(ctx.window, pos.x(), pos.y());
 }
 
+#ifdef __EMSCRIPTEN__
+namespace{
+vec2i check_resize_emscripten(sdl2_backend& b)
+{
+    double width, height;
+    emscripten_get_element_css_size("canvas", &width, &height);
+    emscripten_set_canvas_size((int)width, (int)height);
+
+    return {width, height};
+}
+}
+#endif // __EMSCRIPTEN__
+
 bool sdl2_backend::is_vsync()
 {
     return SDL_GL_GetSwapInterval() != 0;
@@ -242,7 +268,11 @@ void sdl2_backend::set_vsync(bool enabled)
 
 void sdl2_backend::poll_events_only(double maximum_sleep_s)
 {
-    bool first = true;
+    auto next_size = get_window_size();
+
+    #ifdef __EMSCRIPTEN__
+    next_size = check_resize_emscripten(*this);
+    #endif // __EMSCRIPTEN__
 
     while(1)
     {
@@ -259,20 +289,10 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             break;
         }
         #else
-        /*if(first)
-        {
-            int res = SDL_WaitEventTimeout(&e, maximum_sleep_s * 1000);
+        int res = SDL_PollEvent(&e);
 
-            if(res == 0)
-                break;
-        }
-        else*/
-        {
-            int res = SDL_PollEvent(&e);
-
-            if(res == 0)
-                break;
-        }
+        if(res == 0)
+            break;
         #endif
 
         ImGui_ImplSDL2_ProcessEvent(&e);
@@ -300,16 +320,26 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             dropped.push_back(fle);
         }
 
+        #ifndef __EMSCRIPTEN__
         if(e.type == SDL_WINDOWEVENT && e.window.windowID == SDL_GetWindowID(ctx.window))
         {
             if(e.window.event == SDL_WINDOWEVENT_CLOSE)
                 closing = true;
 
             if(e.window.event == SDL_WINDOWEVENT_RESIZED || e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
-                resize({e.window.data1, e.window.data2});
-        }
+            {
+                int width = e.window.data1;
+                int height = e.window.data2;
 
-        first = false;
+                next_size = {width, height};
+            }
+        }
+        #endif // __EMSCRIPTEN__
+    }
+
+    if(next_size != last_size)
+    {
+        resize(next_size);
     }
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -398,6 +428,11 @@ void sdl2_backend::close()
 
 void sdl2_backend::resize(vec2i dim)
 {
+    if(dim == last_size)
+        return;
+
+    last_size = dim;
+
     SDL_SetWindowSize(ctx.window, dim.x(), dim.y());
     init_screen(dim);
 }

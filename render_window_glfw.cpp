@@ -350,6 +350,7 @@ void glfw_backend::set_window_position(vec2i position)
 }
 
 #ifdef __EMSCRIPTEN__
+namespace{
 void check_resize_emscripten(glfw_backend& b)
 {
     double width, height;
@@ -362,6 +363,7 @@ void check_resize_emscripten(glfw_backend& b)
     vec2i dim = {width, height};
 
     b.resize(dim);
+}
 }
 #endif // __EMSCRIPTEN__
 
