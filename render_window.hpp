@@ -86,6 +86,7 @@ struct generic_backend
     virtual vec2i get_window_position(){return {0,0};}
     virtual void set_window_position(vec2i pos){(void)pos;}
     virtual void resize(vec2i dim){(void)dim;}
+    virtual std::string get_key_name(int key_id){return "";}
 
     virtual bool has_dropped_file(){return false;}
     virtual dropped_file get_next_dropped_file(){return dropped_file();}

@@ -614,6 +614,109 @@ void glfw_backend::resize(vec2i dim)
     init_screen(dim);
 }
 
+std::string glfw_backend::get_key_name(int key_id)
+{
+    std::map<int, std::string> key_map;
+
+    key_map[GLFW_KEY_ENTER] = "return";
+    key_map[GLFW_KEY_BACKSPACE] = "backspace";
+    key_map[GLFW_KEY_DELETE] = "delete";
+    key_map[GLFW_KEY_INSERT] = "insert";
+    key_map[GLFW_KEY_TAB] = "tab";
+
+    key_map[GLFW_KEY_UP] = "up";
+    key_map[GLFW_KEY_DOWN] = "down";
+    key_map[GLFW_KEY_LEFT] = "left";
+    key_map[GLFW_KEY_RIGHT] = "right";
+    key_map[GLFW_KEY_HOME] = "home";
+    key_map[GLFW_KEY_END] = "end";
+    key_map[GLFW_KEY_PAGE_UP] = "pageup";
+    key_map[GLFW_KEY_PAGE_DOWN] = "pagedown";
+    key_map[GLFW_KEY_LEFT_SHIFT] = "lshift";
+    key_map[GLFW_KEY_RIGHT_SHIFT] = "rshift";
+    key_map[GLFW_KEY_LEFT_CONTROL] = "lctrl";
+    key_map[GLFW_KEY_RIGHT_CONTROL] = "rctrl";
+    key_map[GLFW_KEY_LEFT_ALT] = "lalt";
+    key_map[GLFW_KEY_RIGHT_ALT] = "ralt";
+    key_map[GLFW_KEY_ESCAPE] = "escape";
+
+    key_map[GLFW_KEY_APOSTROPHE] = "'";
+    key_map[GLFW_KEY_COMMA] = ",";
+    key_map[GLFW_KEY_MINUS] = "-";
+    key_map[GLFW_KEY_PERIOD] = ".";
+    key_map[GLFW_KEY_SLASH] = "/";
+    key_map[GLFW_KEY_SEMICOLON] = ";";
+    key_map[GLFW_KEY_EQUAL] = "=";
+    key_map[GLFW_KEY_LEFT_BRACKET] = "[";
+    key_map[GLFW_KEY_RIGHT_BRACKET] = "]";
+    key_map[GLFW_KEY_BACKSLASH] = "\\";
+    key_map[GLFW_KEY_0] = "0";
+    key_map[GLFW_KEY_1] = "1";
+    key_map[GLFW_KEY_2] = "2";
+    key_map[GLFW_KEY_3] = "3";
+    key_map[GLFW_KEY_4] = "4";
+    key_map[GLFW_KEY_5] = "5";
+    key_map[GLFW_KEY_6] = "6";
+    key_map[GLFW_KEY_7] = "7";
+    key_map[GLFW_KEY_8] = "8";
+    key_map[GLFW_KEY_9] = "9";
+
+    key_map[GLFW_KEY_A] = "a";
+    key_map[GLFW_KEY_B] = "b";
+    key_map[GLFW_KEY_C] = "c";
+    key_map[GLFW_KEY_D] = "d";
+    key_map[GLFW_KEY_E] = "e";
+    key_map[GLFW_KEY_F] = "f";
+    key_map[GLFW_KEY_G] = "g";
+    key_map[GLFW_KEY_H] = "h";
+    key_map[GLFW_KEY_I] = "i";
+    key_map[GLFW_KEY_J] = "j";
+    key_map[GLFW_KEY_K] = "k";
+    key_map[GLFW_KEY_L] = "l";
+    key_map[GLFW_KEY_M] = "m";
+    key_map[GLFW_KEY_N] = "n";
+    key_map[GLFW_KEY_O] = "o";
+    key_map[GLFW_KEY_P] = "p";
+    key_map[GLFW_KEY_Q] = "q";
+    key_map[GLFW_KEY_R] = "r";
+    key_map[GLFW_KEY_S] = "s";
+    key_map[GLFW_KEY_T] = "t";
+    key_map[GLFW_KEY_U] = "u";
+    key_map[GLFW_KEY_V] = "v";
+    key_map[GLFW_KEY_W] = "w";
+    key_map[GLFW_KEY_X] = "x";
+    key_map[GLFW_KEY_Y] = "y";
+    key_map[GLFW_KEY_Z] = "z";
+
+    key_map[GLFW_KEY_KP_0] = "kp0";
+    key_map[GLFW_KEY_KP_1] = "kp1";
+    key_map[GLFW_KEY_KP_2] = "kp2";
+    key_map[GLFW_KEY_KP_3] = "kp3";
+    key_map[GLFW_KEY_KP_4] = "kp4";
+    key_map[GLFW_KEY_KP_5] = "kp5";
+    key_map[GLFW_KEY_KP_6] = "kp6";
+    key_map[GLFW_KEY_KP_7] = "kp7";
+    key_map[GLFW_KEY_KP_8] = "kp8";
+    key_map[GLFW_KEY_KP_9] = "kp9";
+
+    key_map[GLFW_KEY_KP_DECIMAL] = "kp.";
+    key_map[GLFW_KEY_KP_DIVIDE] = "kp/";
+    key_map[GLFW_KEY_KP_MULTIPLY] = "kp*";
+    key_map[GLFW_KEY_KP_SUBTRACT] = "kp-";
+    key_map[GLFW_KEY_KP_ADD] = "kp+";
+    key_map[GLFW_KEY_KP_EQUAL] = "kp=";
+    key_map[GLFW_KEY_KP_ENTER] = "kpenter";
+
+    key_map[GLFW_KEY_SPACE] = "space";
+
+    auto it = key_map.find(key_id);
+
+    if(it == key_map.end())
+        return "";
+    else
+        return it->second;
+}
+
 bool glfw_backend::has_dropped_file()
 {
     return dropped.size() > 0;
