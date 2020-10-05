@@ -1,11 +1,10 @@
 #include "clipboard.hpp"
+#include <imgui/imgui.h>
 
 #include <stdexcept>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
-#else
-#include <GLFW/glfw3.h>
 #endif // __EMSCRIPTEN__
 
 #ifdef __EMSCRIPTEN__
@@ -62,7 +61,7 @@ EM_JS(void, get_osclipdata, (char* out, int len),
 void clipboard::set(const std::string& data)
 {
     #ifndef __EMSCRIPTEN__
-    glfwSetClipboardString(NULL, data.c_str());
+    ImGui::SetClipboardText(data.c_str());
     #else
     static int init_clip = init_copy();
     copy_js(data.c_str());
@@ -72,12 +71,12 @@ void clipboard::set(const std::string& data)
 std::string clipboard::get()
 {
     #ifndef __EMSCRIPTEN__
-    const char* ptr = glfwGetClipboardString(NULL);
+    const char* clip = ImGui::GetClipboardText();
 
-    if(ptr == nullptr)
+    if(clip == nullptr)
         return "";
 
-    return ptr;
+    return std::string(clip);
     #else
     int clip_len = get_osclipdata_length();
     std::string clip_buf;
