@@ -8,15 +8,13 @@
 #endif // __EMSCRIPTEN__
 
 #ifdef __EMSCRIPTEN__
-EM_JS(int, init_copy, (),
+EM_JS(void, init_copy, (),
 {
     var clipboardBuffer = document.createElement('textarea');
     clipboardBuffer.style.cssText = 'position:fixed; top:-10px; left:-10px; height:0; width:0; opacity:0;';
     document.body.appendChild(clipboardBuffer);
 
     Module.clipbuffer = clipboardBuffer;
-
-    return 0;
 });
 
 EM_JS(void, copy_js, (const char* data),
@@ -63,7 +61,7 @@ void clipboard::set(const std::string& data)
     #ifndef __EMSCRIPTEN__
     ImGui::SetClipboardText(data.c_str());
     #else
-    static int init_clip = init_copy();
+    init_copy();
     copy_js(data.c_str());
     #endif
 }
