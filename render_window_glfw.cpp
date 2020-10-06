@@ -610,6 +610,24 @@ std::string glfw_backend::get_key_name(int key_id)
         return it->second;
 }
 
+bool glfw_backend::is_maximised()
+{
+    return glfwGetWindowAttrib(ctx.window, GLFW_MAXIMIZED);
+}
+
+void glfw_backend::set_is_maximised(bool set_max)
+{
+    bool is_max = is_maximised();
+
+    if(is_max == set_max)
+        return;
+
+    if(set_max)
+        glfwMaximizeWindow(ctx.window);
+    else
+        glfwRestoreWindow(ctx.window);
+}
+
 bool glfw_backend::has_dropped_file()
 {
     return dropped.size() > 0;

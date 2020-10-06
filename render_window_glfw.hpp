@@ -58,6 +58,8 @@ struct glfw_backend : generic_backend
     void set_window_position(vec2i position) override;
     void resize(vec2i dim) override;
     std::string get_key_name(int key_id) override;
+    bool is_maximised() override;
+    void set_is_maximised(bool set_max) override;
 
     bool has_dropped_file() override;
     dropped_file get_next_dropped_file() override;

@@ -93,6 +93,8 @@ struct generic_backend
     virtual void set_window_position(vec2i pos){(void)pos;}
     virtual void resize(vec2i dim){(void)dim;}
     virtual std::string get_key_name(int key_id){return "";}
+    virtual bool is_maximised(){return false;}
+    virtual void set_is_maximised(bool set_max){}
 
     virtual bool has_dropped_file(){return false;}
     virtual dropped_file get_next_dropped_file(){return dropped_file();}

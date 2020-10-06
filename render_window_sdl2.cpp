@@ -272,6 +272,12 @@ void sdl2_backend::set_vsync(bool enabled)
 
 void sdl2_backend::poll_events_only(double maximum_sleep_s)
 {
+    if(set_frames > 0)
+    {
+        SDL_SetWindowPosition(ctx.window, next_position.x(), next_position.y());
+        set_frames--;
+    }
+
     auto next_size = get_window_size();
 
     #ifdef __EMSCRIPTEN__
@@ -552,6 +558,28 @@ std::string sdl2_backend::get_key_name(int key_id)
         return "";
     else
         return it->second;
+}
+
+bool sdl2_backend::is_maximised()
+{
+    uint32_t flags = SDL_GetWindowFlags(ctx.window);
+
+    return (flags & SDL_WINDOW_MAXIMIZED) > 0;
+}
+
+void sdl2_backend::set_is_maximised(bool set_max)
+{
+    if(set_max == is_maximised())
+        return;
+
+    if(set_max)
+    {
+        SDL_MaximizeWindow(ctx.window);
+        next_position = {0,0};
+        set_frames = 5;
+    }
+    else
+        SDL_RestoreWindow(ctx.window);
 }
 
 bool sdl2_backend::has_dropped_file()
