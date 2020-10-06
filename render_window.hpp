@@ -68,6 +68,12 @@ struct opencl_context
 };
 #endif // NO_OPENCL
 
+namespace emscripten_drag_drop
+{
+    void init();
+    std::vector<dropped_file> get_dropped_files();
+}
+
 struct generic_backend
 {
     //virtual void set_srgb(bool enabled){}

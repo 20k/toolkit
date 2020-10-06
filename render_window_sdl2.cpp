@@ -182,6 +182,10 @@ sdl2_backend::sdl2_backend(const render_settings& sett, const std::string& windo
     if(sett.opencl)
         clctx = new opencl_context;
     #endif // NO_OPENCL
+
+    #ifdef __EMSCRIPTEN__
+    emscripten_drag_drop::init();
+    #endif // __EMSCRIPTEN__
 }
 
 sdl2_backend::~sdl2_backend()
@@ -302,6 +306,7 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             closing = true;
         }
 
+        #ifndef __EMSCRIPTEN__
         if(e.type == SDL_DROPFILE && e.drop.type == SDL_DROPFILE)
         {
             std::string name = e.drop.file;
@@ -320,7 +325,6 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
             dropped.push_back(fle);
         }
 
-        #ifndef __EMSCRIPTEN__
         if(e.type == SDL_WINDOWEVENT && e.window.windowID == SDL_GetWindowID(ctx.window))
         {
             if(e.window.event == SDL_WINDOWEVENT_CLOSE)
@@ -336,6 +340,15 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
         }
         #endif // __EMSCRIPTEN__
     }
+
+    #ifdef __EMSCRIPTEN__
+    auto vals = emscripten_drag_drop::get_dropped_files();
+
+    for(auto& i : vals)
+    {
+        dropped.push_back(i);
+    }
+    #endif // __EMSCRIPTEN__
 
     if(next_size != last_size)
     {
@@ -531,6 +544,7 @@ std::string sdl2_backend::get_key_name(int key_id)
     key_map[SDL_SCANCODE_KP_ENTER] = "kpenter";
 
     key_map[SDL_SCANCODE_KP_SPACE] = "space";
+    key_map[SDL_SCANCODE_SPACE] = "space";
 
     auto it = key_map.find(key_id);
 

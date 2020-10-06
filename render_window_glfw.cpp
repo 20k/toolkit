@@ -71,79 +71,6 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
 }
 #endif // __EMSCRIPTEN__
 
-#ifdef __EMSCRIPTEN__
-EM_JS(int, num_dropped_files, (),
-{
-    return Module.dropped.length;
-});
-
-EM_JS(int, dropped_array_member_length, (int idx, int member),
-{
-    return Module.dropped[idx][member].length;
-});
-
-EM_JS(void, dropped_array_member, (int idx, int member, char* out),
-{
-    var member = Module.dropped[idx][member];
-
-    stringToUTF8(member, out, member.length+1);
-});
-
-EM_JS(void, clear_dropped, (),
-{
-    Module.dropped = [];
-});
-
-EM_JS(void, drag_drop_init, (),
-{
-    Module.dropped = [];
-
-    function dragenter(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-    }
-
-    function dragover(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-    }
-
-    function drop(e)
-    {
-        e.stopPropagation();
-        e.preventDefault();
-
-        const dt = e.dataTransfer;
-        const all_files = dt.files;
-
-        for(var i=0; i < all_files.length; i++)
-        {
-            const file = all_files[i];
-
-            var read = new FileReader();
-
-            read.readAsBinaryString(file);
-
-            read.onloadend = function()
-            {
-                Module.dropped.push([file.name, read.result]);
-                console.log(Module.dropped[Module.dropped.length-1]);
-            }
-        }
-    }
-
-    let elem = document.getElementById("canvas");
-    elem.addEventListener("dragenter", dragenter, false);
-    elem.addEventListener("dragover", dragover, false);
-    elem.addEventListener("drop", drop, false);
-
-    console.log("registered");
-});
-#endif // __EMSCRIPTEN__
-
-
 void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 {
     int wx = dim.x();
@@ -293,7 +220,7 @@ glfw_backend::glfw_backend(const render_settings& sett, const std::string& windo
     #endif // NO_OPENCL
 
     #ifdef __EMSCRIPTEN__
-    drag_drop_init();
+    emscripten_drag_drop::init();
     #endif // __EMSCRIPTEN__
 }
 
@@ -367,18 +294,6 @@ void check_resize_emscripten(glfw_backend& b)
 }
 #endif // __EMSCRIPTEN__
 
-std::string fixup_string(std::string in)
-{
-    if(in.size() == 0)
-        return in;
-
-    int clen = strlen(in.c_str());
-
-    in.resize(clen);
-
-    return in;
-}
-
 bool glfw_backend::is_vsync()
 {
     return is_vsync_enabled;
@@ -418,34 +333,12 @@ void glfw_backend::poll_events_only(double maximum_sleep_s)
     ImGui_ImplGlfw_NewFrame();
 
     #ifdef __EMSCRIPTEN__
-    int num_files = num_dropped_files();
+    auto vals = emscripten_drag_drop::get_dropped_files();
 
-    for(int array_idx = 0; array_idx < num_files; array_idx++)
+    for(auto& i : vals)
     {
-        int name_length = dropped_array_member_length(array_idx, 0);
-        int data_length = dropped_array_member_length(array_idx, 1);
-
-        std::string name;
-        name.resize(name_length + 1);
-
-        std::string data;
-        data.resize(data_length + 1);
-
-        char* nptr = &name[0];
-        char* dptr = &data[0];
-
-        dropped_array_member(array_idx, 0, nptr);
-        dropped_array_member(array_idx, 1, dptr);
-
-        dropped_file next;
-        next.name = fixup_string(name);
-        next.data = fixup_string(data);
-
-        dropped.push_back(next);
+        dropped.push_back(i);
     }
-
-    clear_dropped();
-
     #endif // __EMSCRIPTEN__
 
     #ifdef __EMSCRIPTEN__
