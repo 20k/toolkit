@@ -3,7 +3,6 @@
 
 #include "render_window.hpp"
 #include <SDL.h>
-#include <optional>
 
 struct sdl2_render_context
 {
