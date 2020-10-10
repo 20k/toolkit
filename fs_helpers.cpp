@@ -271,6 +271,19 @@ bool file::remove(const std::string& name)
     #endif
 }
 
+void file::mkdir(const std::string& name)
+{
+    #ifndef __EMSCRIPTEN__
+    #ifdef __WIN32__
+    ::mkdir(name.c_str());
+    #else
+    ::mkdir(name.c_str(), 0777);
+    #endif // __WIN32__
+    #else
+    ::mkdir(("web/" + name).c_str());
+    #endif
+}
+
 #ifdef __EMSCRIPTEN__
 EM_JS(void, handle_download, (const char* fullname),
 {

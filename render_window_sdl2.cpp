@@ -21,7 +21,11 @@
 
 #ifndef __EMSCRIPTEN__
 #include <filesystem>
+#ifdef __WIN32__
 #include <windows.h>
+#else
+#include <SFML/System/Sleep.hpp>
+#endif // __WIN32__
 #endif // __EMSCRIPTEN__
 
 namespace
@@ -294,7 +298,13 @@ void sdl2_backend::poll_events_only(double maximum_sleep_s)
         if(res == 0)
         {
             if(maximum_sleep_s != 0)
+            {
+                #ifdef __WIN32__
                 MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD) (maximum_sleep_s * 1e3), QS_ALLEVENTS);
+                #else
+                sf::sleep(sf::milliseconds(1));
+                #endif // __WIN32__
+            }
 
             break;
         }

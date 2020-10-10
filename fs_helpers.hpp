@@ -29,6 +29,8 @@ namespace file
     void rename(const std::string& from, const std::string& to);
     bool remove(const std::string& name);
 
+    void mkdir(const std::string& name);
+
     #ifdef __EMSCRIPTEN__
     // EMSCRIPTEN ONLY OBVIOUSLY
     void download(const std::string& name, const std::string& data);
