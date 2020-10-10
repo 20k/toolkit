@@ -7,10 +7,12 @@
 #include <sstream>
 #include <fstream>
 #include <atomic>
+#include <stdlib.h>
 
 #ifdef __WIN32__
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <direct.h>
 #else
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -275,7 +277,7 @@ void file::mkdir(const std::string& name)
 {
     #ifndef __EMSCRIPTEN__
     #ifdef __WIN32__
-    ::mkdir(name.c_str());
+    ::_mkdir(name.c_str());
     #else
     ::mkdir(name.c_str(), 0777);
     #endif // __WIN32__
