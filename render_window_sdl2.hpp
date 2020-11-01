@@ -1,0 +1,66 @@
+#ifndef RENDER_WINDOW_SDL2_HPP_INCLUDED
+#define RENDER_WINDOW_SDL2_HPP_INCLUDED
+
+#include "render_window.hpp"
+#include <SDL.h>
+
+struct sdl2_render_context
+{
+    unsigned int fbo;
+    unsigned int screen_tex;
+
+    unsigned int fbo_srgb;
+    unsigned int screen_tex_srgb;
+
+    SDL_Window* window = nullptr;
+    SDL_GLContext glcontext;
+    ImFontAtlas atlas = {};
+
+    sdl2_render_context(const render_settings& sett, const std::string& window_title);
+    ~sdl2_render_context();
+
+    void init_screen(vec2i dim);
+};
+
+struct sdl2_backend : generic_backend
+{
+    sdl2_render_context ctx;
+    opencl_context* clctx = nullptr;
+
+    sdl2_backend(const render_settings& sett, const std::string& window_title);
+    ~sdl2_backend();
+
+    bool is_vsync() override;
+    void set_vsync(bool enabled) override;
+    void poll(double maximum_sleep_s = 0) override;
+    void poll_events_only(double maximum_sleep_s = 0) override;
+    void poll_issue_new_frame_only() override;
+    void display() override;
+    void display_last_frame() override;
+    bool should_close() override;
+    void close() override;
+    void init_screen(vec2i dim) override;
+    opencl_context* get_opencl_context() override;
+    vec2i get_window_size() override;
+    vec2i get_window_position() override;
+    void set_window_position(vec2i position) override;
+    void resize(vec2i dim) override;
+    std::string get_key_name(int key_id) override;
+    bool is_maximised() override;
+    void set_is_maximised(bool set_max) override;
+
+    bool has_dropped_file() override;
+    dropped_file get_next_dropped_file() override;
+    void pop_dropped_file() override;
+
+private:
+    bool closing = false;
+    std::vector<dropped_file> dropped;
+    vec2i last_size;
+
+    vec2i next_position;
+    int set_frames = 0;
+};
+
+
+#endif // RENDER_WINDOW_SDL2_HPP_INCLUDED

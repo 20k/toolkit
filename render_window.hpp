@@ -13,21 +13,8 @@
 #include <networking/serialisable_fwd.hpp>
 #include "clock.hpp"
 
-struct GLFWwindow;
 struct texture;
 struct vertex;
-
-/*namespace window_flags
-{
-    enum window_flags
-    {
-        NONE = 0,
-        SRGB = 1,
-        NO_DOUBLE_BUFFER = 2,
-        VIEWPORTS = 4,
-        OPENCL = 8,
-    };
-}*/
 
 struct dropped_file
 {
@@ -63,22 +50,6 @@ struct frostable
     vec2i dim;
 };
 
-struct glfw_render_context
-{
-    unsigned int fbo;
-    unsigned int screen_tex;
-
-    unsigned int fbo_srgb;
-    unsigned int screen_tex_srgb;
-
-    GLFWwindow* window = nullptr;
-    ImFontAtlas atlas = {};
-
-    glfw_render_context(const render_settings& sett, const std::string& window_title);
-    ~glfw_render_context();
-
-    void init_screen(vec2i dim);
-};
 
 #ifdef NO_OPENCL
 struct opencl_context
@@ -97,6 +68,12 @@ struct opencl_context
 };
 #endif // NO_OPENCL
 
+namespace emscripten_drag_drop
+{
+    void init();
+    std::vector<dropped_file> get_dropped_files();
+}
+
 struct generic_backend
 {
     //virtual void set_srgb(bool enabled){}
@@ -113,48 +90,17 @@ struct generic_backend
     virtual opencl_context* get_opencl_context(){return nullptr;}
     virtual vec2i get_window_size(){return {ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y};}
     virtual vec2i get_window_position(){return {0,0};}
+    virtual void set_window_position(vec2i pos){(void)pos;}
     virtual void resize(vec2i dim){(void)dim;}
+    virtual std::string get_key_name(int key_id){return "";}
+    virtual bool is_maximised(){return false;}
+    virtual void set_is_maximised(bool set_max){}
 
     virtual bool has_dropped_file(){return false;}
     virtual dropped_file get_next_dropped_file(){return dropped_file();}
     virtual void pop_dropped_file(){}
 
     virtual ~generic_backend(){}
-};
-
-struct glfw_backend : generic_backend
-{
-    glfw_render_context ctx;
-    opencl_context* clctx = nullptr;
-
-    glfw_backend(const render_settings& sett, const std::string& window_title);
-    ~glfw_backend();
-
-    //void set_srgb(bool enabled) override;
-    bool is_vsync() override;
-    void set_vsync(bool enabled) override;
-    void poll(double maximum_sleep_s = 0) override;
-    void poll_events_only(double maximum_sleep_s = 0) override;
-    void poll_issue_new_frame_only() override;
-    void display() override;
-    void display_last_frame() override;
-    bool should_close() override;
-    void close() override;
-    void init_screen(vec2i dim) override;
-    opencl_context* get_opencl_context() override;
-    vec2i get_window_size() override;
-    vec2i get_window_position() override;
-    void resize(vec2i dim) override;
-
-    bool has_dropped_file() override;
-    dropped_file get_next_dropped_file() override;
-    void pop_dropped_file() override;
-
-    vec2i last_size;
-private:
-    bool closing = false;
-    std::vector<dropped_file> dropped;
-    bool is_vsync_enabled = false;
 };
 
 #ifdef USE_IMTUI
@@ -193,6 +139,7 @@ struct render_window
     opencl_context* clctx = nullptr;
 
     render_window(render_settings sett, const std::string& window_title, backend_type::type type = backend_type::GLFW);
+    render_window(render_settings sett, generic_backend* backend);
     ~render_window();
 
     render_settings get_render_settings();
