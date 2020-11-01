@@ -270,7 +270,7 @@ void cl::program::build(context& ctx, const std::string& options)
 
     if(build_status != CL_SUCCESS)
     {
-        std::cout << "Build Error" << std::endl;
+        std::cout << "Build Error: " << build_status << std::endl;
 
         cl_build_status bstatus;
         clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
