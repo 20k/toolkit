@@ -677,7 +677,7 @@ void cl::command_queue::flush()
 
 cl::gl_rendertexture::gl_rendertexture(context& ctx)
 {
-    native_context.data = ctx.native_context.data;
+    native_context = ctx.native_context;
 }
 
 void cl::gl_rendertexture::create(int _w, int _h)
