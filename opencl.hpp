@@ -35,6 +35,16 @@ namespace cl
             }
         }
 
+        void consume(T raw)
+        {
+            if(data)
+            {
+                V(data);
+            }
+
+            data = raw;
+        }
+
         base<T, U, V>& operator=(const base<T, U, V>& other)
         {
             if(this == &other)

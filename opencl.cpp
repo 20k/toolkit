@@ -312,7 +312,7 @@ void cl::buffer::alloc(int64_t bytes)
         throw std::runtime_error("Could not allocate buffer");
     }
 
-    native_mem_object.data = found;
+    native_mem_object.consume(found);
 }
 
 void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
@@ -422,7 +422,7 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
 
     dimensions = dims;
     sizes = _sizes;
-    native_mem_object.data = ret;
+    native_mem_object.consume(ret);
 }
 
 void cl::image_base::clear(cl::command_queue& cqueue)
@@ -510,7 +510,7 @@ void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& 
 
     dimensions = dims;
     sizes = _sizes;
-    native_mem_object.data = ret;
+    native_mem_object.consume(ret);
 }
 
 void cl::image_with_mipmaps::write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level)
@@ -706,7 +706,7 @@ void cl::gl_rendertexture::create(int _w, int _h)
         throw std::runtime_error("Failure in create rendertexture");
     }
 
-    native_mem_object.data = cmem;
+    native_mem_object.consume(cmem);
 }
 
 void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
@@ -724,7 +724,7 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
     }
 
     texture_id = _texture_id;
-    native_mem_object.data = cmem;
+    native_mem_object.consume(cmem);
 
     int w, h, d;
     int miplevel = 0;
@@ -757,10 +757,9 @@ void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, 
     }
 
     texture_id = _texture_id;
-    native_mem_object.data = cmem;
+    native_mem_object.consume(cmem);
 
     int w, h, d;
-    int miplevel = 0;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_WIDTH, &w);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_HEIGHT, &h);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_DEPTH, &d);
