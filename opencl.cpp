@@ -303,6 +303,8 @@ void cl::buffer::alloc(int64_t bytes)
 {
     alloc_size = bytes;
 
+    native_mem_object.release();
+
     cl_int err;
     cl_mem found = clCreateBuffer(native_context.data, CL_MEM_READ_WRITE, alloc_size, nullptr, &err);
 
@@ -412,6 +414,8 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
         desc.image_depth = _sizes[2];
     }
 
+    native_mem_object.release();
+
     cl_int err;
     cl_mem ret = clCreateImage(native_context.data, CL_MEM_READ_WRITE, &format, &desc, nullptr, &err);
 
@@ -499,6 +503,8 @@ void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& 
         desc.image_height = _sizes[1];
         desc.image_depth = _sizes[2];
     }
+
+    native_mem_object.release();
 
     cl_int err;
     cl_mem ret = clCreateImage(native_context.data, CL_MEM_READ_WRITE, &format, &desc, nullptr, &err);
@@ -697,6 +703,8 @@ void cl::gl_rendertexture::create(int _w, int _h)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+    native_mem_object.release();
+
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, texture_id, &err);
 
@@ -713,6 +721,8 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
 {
     ///Do I need this?
     glBindTexture(GL_TEXTURE_2D, _texture_id);
+
+    native_mem_object.release();
 
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, _texture_id, &err);
@@ -746,6 +756,8 @@ void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, 
 {
     ///Do I need this?
     glBindTexture(GL_TEXTURE_2D, _texture_id);
+
+    native_mem_object.release();
 
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, mip_level, _texture_id, &err);

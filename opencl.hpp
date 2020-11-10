@@ -45,6 +45,16 @@ namespace cl
             data = raw;
         }
 
+        void release()
+        {
+            if(data)
+            {
+                V(data);
+            }
+
+            data = nullptr;
+        }
+
         base<T, U, V>& operator=(const base<T, U, V>& other)
         {
             if(this == &other)
