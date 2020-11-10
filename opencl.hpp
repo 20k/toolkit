@@ -236,6 +236,21 @@ namespace cl
 
             return ret;
         }
+
+        template<int N>
+        vec<N, size_t> size()
+        {
+            vec<N, size_t> ret;
+
+            static_assert(N <= 3);
+
+            for(int i=0; i < N; i++)
+            {
+                ret.v[i] = sizes[i];
+            }
+
+            return ret;
+        }
     };
 
     struct image : image_base

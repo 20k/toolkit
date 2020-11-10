@@ -725,6 +725,20 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
 
     texture_id = _texture_id;
     native_mem_object.data = cmem;
+
+    int w, h, d;
+    int miplevel = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &w);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &h);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_DEPTH, &d);
+
+    sizes[0] = w;
+    sizes[1] = h;
+
+    if(d < 1)
+        d = 1;
+
+    sizes[2] = d;
 }
 
 ///unfortunately, this does not support -1 which would have been superhumanly useful
@@ -744,6 +758,20 @@ void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, 
 
     texture_id = _texture_id;
     native_mem_object.data = cmem;
+
+    int w, h, d;
+    int miplevel = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_WIDTH, &w);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_HEIGHT, &h);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_DEPTH, &d);
+
+    sizes[0] = w;
+    sizes[1] = h;
+
+    if(d < 1)
+        d = 1;
+
+    sizes[2] = d;
 }
 
 void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
