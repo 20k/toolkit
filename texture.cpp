@@ -4,6 +4,11 @@
 
 void texture::load_from_memory(const uint8_t* pixels_rgba, vec2i _dim)
 {
+    if(handle != 0)
+    {
+        glDeleteTextures(1, &handle);
+    }
+
     dim = _dim;
 
     glGenTextures(1, &handle);
@@ -21,6 +26,11 @@ void texture::load_from_memory(const uint8_t* pixels_rgba, vec2i _dim)
 
 void texture::load_from_memory(const texture_settings& settings, const uint8_t* pixels_rgba)
 {
+    if(handle != 0)
+    {
+        glDeleteTextures(1, &handle);
+    }
+
     dim = {settings.width, settings.height};
 
     glGenTextures(1, &handle);
@@ -59,4 +69,12 @@ void texture::load_from_memory(const texture_settings& settings, const uint8_t* 
 vec2i texture::get_size()
 {
     return dim;
+}
+
+texture::~texture()
+{
+    if(handle != 0)
+    {
+        glDeleteTextures(1, &handle);
+    }
 }
