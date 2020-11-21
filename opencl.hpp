@@ -105,7 +105,7 @@ namespace cl
 
     struct arg_info
     {
-        void* ptr = nullptr;
+        const void* ptr = nullptr;
         int64_t size = 0;
     };
 
@@ -115,7 +115,7 @@ namespace cl
 
         template<typename T>
         inline
-        void push_back(T& val)
+        void push_back(const T& val)
         {
             arg_info inf;
             inf.ptr = &val;
@@ -486,7 +486,7 @@ namespace cl
 
 template<>
 inline
-void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
+void cl::args::push_back<cl::mem_object>(const cl::mem_object& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
@@ -497,7 +497,7 @@ void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
 
 template<>
 inline
-void cl::args::push_back<cl::buffer>(cl::buffer& val)
+void cl::args::push_back<cl::buffer>(const cl::buffer& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
@@ -508,7 +508,7 @@ void cl::args::push_back<cl::buffer>(cl::buffer& val)
 
 template<>
 inline
-void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
+void cl::args::push_back<cl::gl_rendertexture>(const cl::gl_rendertexture& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
@@ -519,7 +519,7 @@ void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
 
 template<>
 inline
-void cl::args::push_back<cl::image>(cl::image& val)
+void cl::args::push_back<cl::image>(const cl::image& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
@@ -530,7 +530,7 @@ void cl::args::push_back<cl::image>(cl::image& val)
 
 template<>
 inline
-void cl::args::push_back<cl::image_with_mipmaps>(cl::image_with_mipmaps& val)
+void cl::args::push_back<cl::image_with_mipmaps>(const cl::image_with_mipmaps& val)
 {
     cl::arg_info inf;
     inf.ptr = &val.native_mem_object.data;
