@@ -475,8 +475,10 @@ cl::image_with_mipmaps::image_with_mipmaps(cl::context& ctx)
     native_context = ctx.native_context;
 }
 
-void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, int mip_levels, const cl_image_format& format)
+void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, int _mip_levels, const cl_image_format& format)
 {
+    mip_levels = _mip_levels;
+
     cl_image_desc desc = {0};
     desc.image_width = 1;
     desc.image_height = 1;

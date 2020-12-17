@@ -348,13 +348,14 @@ namespace cl
         base<cl_context, clRetainContext, clReleaseContext> native_context;
 
         int dimensions = 1;
+        int mip_levels = 0;
 
         image_with_mipmaps(cl::context& ctx);
 
         void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, int mip_levels, const cl_image_format& format);
 
         template<int N>
-        void alloc(const vec<N, int>& in_dims, int mip_levels, const cl_image_format& format)
+        void alloc(const vec<N, int>& in_dims, int _mip_levels, const cl_image_format& format)
         {
             static_assert(N > 0 && N <= 3);
 
@@ -363,7 +364,7 @@ namespace cl
             for(int i=0; i < N; i++)
                 storage[i] = in_dims.v[i];
 
-            return alloc_impl(N, storage, mip_levels, format);
+            return alloc_impl(N, storage, _mip_levels, format);
         }
 
         void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level);
