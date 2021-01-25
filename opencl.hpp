@@ -131,6 +131,7 @@ namespace cl
         base<cl_event, clRetainEvent, clReleaseEvent> native_event;
 
         void block();
+        bool is_finished();
     };
 
     struct program;
@@ -178,6 +179,28 @@ namespace cl
         base<cl_mem, clRetainMemObject, clReleaseMemObject> native_mem_object;
     };
 
+    template<typename T>
+    struct read_info
+    {
+        T* data = nullptr;
+        event evt;
+
+        void consume()
+        {
+            if(data == nullptr)
+                return;
+
+            evt.block();
+            delete [] data;
+            data = nullptr;
+        }
+
+        ~read_info()
+        {
+            consume();
+        }
+    };
+
     struct buffer : mem_object
     {
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -200,6 +223,22 @@ namespace cl
         void write_async(command_queue& write_on, const char* ptr, int64_t bytes);
 
         void read(command_queue& read_on, char* ptr, int64_t bytes);
+
+        event read_async(command_queue& read_on, char* ptr, int64_t bytes);
+
+        template<typename T>
+        read_info<T> read_async(command_queue& read_on, int64_t elements)
+        {
+            read_info<T> ret;
+
+            if(elements == 0)
+                return ret;
+
+            ret.data = new T[elements];
+            ret.evt = read_async(read_on, ret.data, elements * sizeof(T));
+
+            return ret;
+        }
 
         void set_to_zero(command_queue& write_on);
 

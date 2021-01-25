@@ -102,6 +102,19 @@ void cl::event::block()
     clWaitForEvents(1, &native_event.data);
 }
 
+bool cl::event::is_finished()
+{
+    if(native_event.data == nullptr)
+        return true;
+
+    cl_int status = 0;
+
+    if(clGetEventInfo(native_event.data, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(cl_int), (void*)&status, nullptr) != CL_SUCCESS)
+        throw std::runtime_error("Bad event in clGetEventInfo in is_finished");
+
+    return status == CL_COMPLETE;
+}
+
 cl::kernel::kernel()
 {
 
@@ -367,6 +380,22 @@ void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
     {
         throw std::runtime_error("Could not read");
     }
+}
+
+cl::event cl::buffer::read_async(cl::command_queue& read_on, char* ptr, int64_t bytes)
+{
+    assert(bytes <= alloc_size);
+
+    cl::event evt;
+
+    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, ptr, 0, nullptr, &evt.native_event.data);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not read_async");
+    }
+
+    return evt;
 }
 
 void cl::buffer::set_to_zero(cl::command_queue& write_on)
