@@ -235,7 +235,7 @@ namespace cl
                 return ret;
 
             ret.data = new T[elements];
-            ret.evt = read_async(read_on, ret.data, elements * sizeof(T));
+            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T));
 
             return ret;
         }
