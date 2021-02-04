@@ -151,7 +151,7 @@ namespace cl
     struct context
     {
         std::vector<program> programs;
-        std::shared_ptr<std::map<std::string, kernel>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
         cl_device_id selected_device;
 
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -160,6 +160,7 @@ namespace cl
         explicit context(bool); ///defer context creation
 
         void register_program(program& p);
+        void deregister_program(int idx);
     };
 
     struct program
@@ -389,7 +390,7 @@ namespace cl
     {
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
-        std::shared_ptr<std::map<std::string, kernel>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 
