@@ -22,6 +22,7 @@ struct texture
 
     void load_from_memory(const texture_settings& settings, const uint8_t* pixels_rgba);
     vec2i get_size();
+    ~texture();
 
     vec2i dim;
 };

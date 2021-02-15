@@ -35,6 +35,26 @@ namespace cl
             }
         }
 
+        void consume(T raw)
+        {
+            if(data)
+            {
+                V(data);
+            }
+
+            data = raw;
+        }
+
+        void release()
+        {
+            if(data)
+            {
+                V(data);
+            }
+
+            data = nullptr;
+        }
+
         base<T, U, V>& operator=(const base<T, U, V>& other)
         {
             if(this == &other)
@@ -85,7 +105,7 @@ namespace cl
 
     struct arg_info
     {
-        void* ptr = nullptr;
+        const void* ptr = nullptr;
         int64_t size = 0;
     };
 
@@ -111,6 +131,7 @@ namespace cl
         base<cl_event, clRetainEvent, clReleaseEvent> native_event;
 
         void block();
+        bool is_finished();
     };
 
     struct program;
@@ -131,7 +152,7 @@ namespace cl
     struct context
     {
         std::vector<program> programs;
-        std::shared_ptr<std::map<std::string, kernel>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
         cl_device_id selected_device;
 
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -140,6 +161,7 @@ namespace cl
         explicit context(bool); ///defer context creation
 
         void register_program(program& p);
+        void deregister_program(int idx);
     };
 
     struct program
@@ -156,6 +178,28 @@ namespace cl
     struct mem_object
     {
         base<cl_mem, clRetainMemObject, clReleaseMemObject> native_mem_object;
+    };
+
+    template<typename T>
+    struct read_info
+    {
+        T* data = nullptr;
+        event evt;
+
+        void consume()
+        {
+            if(data == nullptr)
+                return;
+
+            evt.block();
+            delete [] data;
+            data = nullptr;
+        }
+
+        ~read_info()
+        {
+            consume();
+        }
     };
 
     struct buffer : mem_object
@@ -180,6 +224,22 @@ namespace cl
         void write_async(command_queue& write_on, const char* ptr, int64_t bytes);
 
         void read(command_queue& read_on, char* ptr, int64_t bytes);
+
+        event read_async(command_queue& read_on, char* ptr, int64_t bytes);
+
+        template<typename T>
+        read_info<T> read_async(command_queue& read_on, int64_t elements)
+        {
+            read_info<T> ret;
+
+            if(elements == 0)
+                return ret;
+
+            ret.data = new T[elements];
+            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T));
+
+            return ret;
+        }
 
         void set_to_zero(command_queue& write_on);
 
@@ -233,6 +293,21 @@ namespace cl
                 return ret;
 
             read_impl(cqueue, lorigin, lregion, (char*)&ret[0]);
+
+            return ret;
+        }
+
+        template<int N>
+        vec<N, size_t> size()
+        {
+            vec<N, size_t> ret;
+
+            static_assert(N <= 3);
+
+            for(int i=0; i < N; i++)
+            {
+                ret.v[i] = sizes[i];
+            }
 
             return ret;
         }
@@ -313,13 +388,14 @@ namespace cl
         base<cl_context, clRetainContext, clReleaseContext> native_context;
 
         int dimensions = 1;
+        int mip_levels = 0;
 
         image_with_mipmaps(cl::context& ctx);
 
         void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, int mip_levels, const cl_image_format& format);
 
         template<int N>
-        void alloc(const vec<N, int>& in_dims, int mip_levels, const cl_image_format& format)
+        void alloc(const vec<N, int>& in_dims, int _mip_levels, const cl_image_format& format)
         {
             static_assert(N > 0 && N <= 3);
 
@@ -328,7 +404,7 @@ namespace cl
             for(int i=0; i < N; i++)
                 storage[i] = in_dims.v[i];
 
-            return alloc_impl(N, storage, mip_levels, format);
+            return alloc_impl(N, storage, _mip_levels, format);
         }
 
         void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level);
@@ -353,7 +429,7 @@ namespace cl
     {
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
-        std::shared_ptr<std::map<std::string, kernel>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 

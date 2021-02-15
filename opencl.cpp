@@ -102,6 +102,19 @@ void cl::event::block()
     clWaitForEvents(1, &native_event.data);
 }
 
+bool cl::event::is_finished()
+{
+    if(native_event.data == nullptr)
+        return true;
+
+    cl_int status = 0;
+
+    if(clGetEventInfo(native_event.data, CL_EVENT_COMMAND_EXECUTION_STATUS, sizeof(cl_int), (void*)&status, nullptr) != CL_SUCCESS)
+        throw std::runtime_error("Bad event in clGetEventInfo in is_finished");
+
+    return status == CL_COMPLETE;
+}
+
 cl::kernel::kernel()
 {
 
@@ -147,7 +160,7 @@ cl::kernel::kernel(cl_kernel k)
 
 cl::context::context()
 {
-    kernels = std::make_shared<std::map<std::string, kernel>>();
+    kernels = std::make_shared<std::vector<std::map<std::string, kernel>>>();
 
     cl_platform_id pid = {};
     get_platform_ids(&pid);
@@ -207,6 +220,8 @@ void cl::context::register_program(cl::program& p)
 
     cl_kernels.resize(num);
 
+    std::map<std::string, cl::kernel>& which = kernels->emplace_back();
+
     for(cl_kernel& k : cl_kernels)
     {
         cl::kernel k1(k);
@@ -215,8 +230,19 @@ void cl::context::register_program(cl::program& p)
 
         std::cout << "Registered " << k1.name << std::endl;
 
-        (*kernels)[k1.name] = k1;
+        which[k1.name] = k1;
     }
+}
+
+void cl::context::deregister_program(int idx)
+{
+    if(idx < 0 || idx >= (int)programs.size())
+        throw std::runtime_error("idx < 0 || idx >= programs.size() in deregister_program for cl::context");
+
+    assert(programs.size() == kernels->size());
+
+    kernels->erase(kernels->begin() + idx);
+    programs.erase(programs.begin() + idx);
 }
 
 cl::program::program(context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
@@ -270,7 +296,7 @@ void cl::program::build(context& ctx, const std::string& options)
 
     if(build_status != CL_SUCCESS)
     {
-        std::cout << "Build Error" << std::endl;
+        std::cout << "Build Error: " << build_status << std::endl;
 
         cl_build_status bstatus;
         clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
@@ -303,6 +329,8 @@ void cl::buffer::alloc(int64_t bytes)
 {
     alloc_size = bytes;
 
+    native_mem_object.release();
+
     cl_int err;
     cl_mem found = clCreateBuffer(native_context.data, CL_MEM_READ_WRITE, alloc_size, nullptr, &err);
 
@@ -312,7 +340,7 @@ void cl::buffer::alloc(int64_t bytes)
         throw std::runtime_error("Could not allocate buffer");
     }
 
-    native_mem_object.data = found;
+    native_mem_object.consume(found);
 }
 
 void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
@@ -367,6 +395,22 @@ void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
     }
 }
 
+cl::event cl::buffer::read_async(cl::command_queue& read_on, char* ptr, int64_t bytes)
+{
+    assert(bytes <= alloc_size);
+
+    cl::event evt;
+
+    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, ptr, 0, nullptr, &evt.native_event.data);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not read_async");
+    }
+
+    return evt;
+}
+
 void cl::buffer::set_to_zero(cl::command_queue& write_on)
 {
     static int zero = 0;
@@ -412,6 +456,8 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
         desc.image_depth = _sizes[2];
     }
 
+    native_mem_object.release();
+
     cl_int err;
     cl_mem ret = clCreateImage(native_context.data, CL_MEM_READ_WRITE, &format, &desc, nullptr, &err);
 
@@ -422,7 +468,7 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
 
     dimensions = dims;
     sizes = _sizes;
-    native_mem_object.data = ret;
+    native_mem_object.consume(ret);
 }
 
 void cl::image_base::clear(cl::command_queue& cqueue)
@@ -471,8 +517,10 @@ cl::image_with_mipmaps::image_with_mipmaps(cl::context& ctx)
     native_context = ctx.native_context;
 }
 
-void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, int mip_levels, const cl_image_format& format)
+void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, int _mip_levels, const cl_image_format& format)
 {
+    mip_levels = _mip_levels;
+
     cl_image_desc desc = {0};
     desc.image_width = 1;
     desc.image_height = 1;
@@ -500,6 +548,8 @@ void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& 
         desc.image_depth = _sizes[2];
     }
 
+    native_mem_object.release();
+
     cl_int err;
     cl_mem ret = clCreateImage(native_context.data, CL_MEM_READ_WRITE, &format, &desc, nullptr, &err);
 
@@ -510,7 +560,7 @@ void cl::image_with_mipmaps::alloc_impl(int dims, const std::array<int64_t, 3>& 
 
     dimensions = dims;
     sizes = _sizes;
-    native_mem_object.data = ret;
+    native_mem_object.consume(ret);
 }
 
 void cl::image_with_mipmaps::write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region, int mip_level)
@@ -582,80 +632,85 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
 
     assert(global_ws.size() == local_ws.size());
 
-    auto kernel_it = kernels->find(kname);
-
-    if(kernel_it == kernels->end())
-        throw std::runtime_error("No such kernel " + kname);
-
-    cl::kernel& kern = kernel_it->second;
-
-    for(int i=0; i < (int)pack.arg_list.size(); i++)
+    for(auto& kerns : *kernels)
     {
-        clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i].size, pack.arg_list[i].ptr);
-    }
+        auto kernel_it = kerns.find(kname);
 
-    int dim = global_ws.size();
-
-    size_t g_ws[3] = {0};
-    size_t l_ws[3] = {0};
-
-    for(int i=0; i < dim; i++)
-    {
-        l_ws[i] = local_ws[i];
-        g_ws[i] = global_ws[i];
-
-        if(l_ws[i] == 0)
+        if(kernel_it == kerns.end())
             continue;
 
-        if((g_ws[i] % l_ws[i]) != 0)
-        {
-            int rem = g_ws[i] % l_ws[i];
+        cl::kernel& kern = kernel_it->second;
 
-            g_ws[i] -= rem;
-            g_ws[i] += l_ws[i];
+        for(int i=0; i < (int)pack.arg_list.size(); i++)
+        {
+            clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i].size, pack.arg_list[i].ptr);
         }
 
-        if(g_ws[i] == 0)
+        int dim = global_ws.size();
+
+        size_t g_ws[3] = {0};
+        size_t l_ws[3] = {0};
+
+        for(int i=0; i < dim; i++)
         {
-            g_ws[i] += l_ws[i];
+            l_ws[i] = local_ws[i];
+            g_ws[i] = global_ws[i];
+
+            if(l_ws[i] == 0)
+                continue;
+
+            if((g_ws[i] % l_ws[i]) != 0)
+            {
+                int rem = g_ws[i] % l_ws[i];
+
+                g_ws[i] -= rem;
+                g_ws[i] += l_ws[i];
+            }
+
+            if(g_ws[i] == 0)
+            {
+                g_ws[i] += l_ws[i];
+            }
         }
-    }
 
-    static_assert(sizeof(cl::event) == sizeof(cl_event));
+        static_assert(sizeof(cl::event) == sizeof(cl_event));
 
-    cl_int err = CL_SUCCESS;
+        cl_int err = CL_SUCCESS;
 
-    #ifndef GPU_PROFILE
-    if(deps.size() > 0)
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
-    else
+        #ifndef GPU_PROFILE
+        if(deps.size() > 0)
+            err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
+        else
+            err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+        #else
+
         err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
-    #else
 
-    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+        cl_ulong start;
+        cl_ulong finish;
 
-    cl_ulong start;
-    cl_ulong finish;
+        block();
 
-    block();
+        clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+        clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
 
-    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
-    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
+        cl_ulong diff = finish - start;
 
-    cl_ulong diff = finish - start;
+        double ddiff = diff / 1000. / 1000.;
 
-    double ddiff = diff / 1000. / 1000.;
+        std::cout << "kernel " << kname << " ms " << ddiff << std::endl;
 
-    std::cout << "kernel " << kname << " ms " << ddiff << std::endl;
+        #endif // GPU_PROFILE
 
-    #endif // GPU_PROFILE
+        if(err != CL_SUCCESS)
+        {
+            std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kname << std::endl;
+        }
 
-    if(err != CL_SUCCESS)
-    {
-        std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kname << std::endl;
+        return ret;
     }
 
-    return ret;
+    throw std::runtime_error("Kernel not found in any program");
 }
 
 cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
@@ -677,7 +732,7 @@ void cl::command_queue::flush()
 
 cl::gl_rendertexture::gl_rendertexture(context& ctx)
 {
-    native_context.data = ctx.native_context.data;
+    native_context = ctx.native_context;
 }
 
 void cl::gl_rendertexture::create(int _w, int _h)
@@ -697,6 +752,8 @@ void cl::gl_rendertexture::create(int _w, int _h)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+    native_mem_object.release();
+
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, texture_id, &err);
 
@@ -706,13 +763,15 @@ void cl::gl_rendertexture::create(int _w, int _h)
         throw std::runtime_error("Failure in create rendertexture");
     }
 
-    native_mem_object.data = cmem;
+    native_mem_object.consume(cmem);
 }
 
 void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
 {
     ///Do I need this?
     glBindTexture(GL_TEXTURE_2D, _texture_id);
+
+    native_mem_object.release();
 
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, _texture_id, &err);
@@ -724,7 +783,21 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
     }
 
     texture_id = _texture_id;
-    native_mem_object.data = cmem;
+    native_mem_object.consume(cmem);
+
+    int w, h, d;
+    int miplevel = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &w);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &h);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_DEPTH, &d);
+
+    sizes[0] = w;
+    sizes[1] = h;
+
+    if(d < 1)
+        d = 1;
+
+    sizes[2] = d;
 }
 
 ///unfortunately, this does not support -1 which would have been superhumanly useful
@@ -732,6 +805,8 @@ void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, 
 {
     ///Do I need this?
     glBindTexture(GL_TEXTURE_2D, _texture_id);
+
+    native_mem_object.release();
 
     cl_int err;
     cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, mip_level, _texture_id, &err);
@@ -743,7 +818,20 @@ void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, 
     }
 
     texture_id = _texture_id;
-    native_mem_object.data = cmem;
+    native_mem_object.consume(cmem);
+
+    int w, h, d;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_WIDTH, &w);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_HEIGHT, &h);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_DEPTH, &d);
+
+    sizes[0] = w;
+    sizes[1] = h;
+
+    if(d < 1)
+        d = 1;
+
+    sizes[2] = d;
 }
 
 void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)

@@ -226,6 +226,12 @@ glfw_backend::glfw_backend(const render_settings& sett, const std::string& windo
 
 void glfw_backend::init_screen(vec2i dim)
 {
+    if(dim.x() < 32)
+        dim.x() = 32;
+
+    if(dim.y() < 32)
+        dim.y() = 32;
+
     make_fbo(&ctx.fbo, &ctx.screen_tex, dim, false);
     make_fbo(&ctx.fbo_srgb, &ctx.screen_tex_srgb, dim, true);
 
