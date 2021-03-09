@@ -5,8 +5,8 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <imgui/misc/freetype/imgui_freetype.h>
-#include <imgui/examples/imgui_impl_glfw.h>
-#include <imgui/examples/imgui_impl_opengl3.h>
+#include <imgui/backends/imgui_impl_glfw.h>
+#include <imgui/backends/imgui_impl_opengl3.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <map>
@@ -101,6 +101,8 @@ glfw_render_context::glfw_render_context(const render_settings& lsett, const std
 {
     render_settings sett = lsett;
 
+    atlas.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LCD | ImGuiFreeTypeBuilderFlags_FILTER_DEFAULT | ImGuiFreeTypeBuilderFlags_LoadColor;
+
     #ifdef __EMSCRIPTEN__
     double width, height;
     emscripten_get_element_css_size("canvas", &width, &height);
@@ -187,7 +189,7 @@ glfw_render_context::glfw_render_context(const render_settings& lsett, const std
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
 
-    ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1);
+    //ImGuiFreeType::BuildFontAtlas(&atlas, ImGuiFreeTypeBuilderFlags_LCD | ImGuiFreeTypeBuilderFlags_FILTER_DEFAULT | ImGuiFreeTypeBuilderFlags_LoadColor);
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
