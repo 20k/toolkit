@@ -52,6 +52,7 @@ struct glfw_backend : generic_backend
     bool should_close() override;
     void close() override;
     void init_screen(vec2i dim) override;
+    void set_is_hidden(bool is_hidden) override;
     opencl_context* get_opencl_context() override;
     vec2i get_window_size() override;
     vec2i get_window_position() override;

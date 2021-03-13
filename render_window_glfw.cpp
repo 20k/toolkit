@@ -246,6 +246,14 @@ void glfw_backend::init_screen(vec2i dim)
     #endif // NO_OPENCL
 }
 
+void glfw_backend::set_is_hidden(bool is_hidden)
+{
+    if(is_hidden)
+        glfwHideWindow(ctx.window);
+    else
+        glfwShowWindow(ctx.window);
+}
+
 glfw_backend::~glfw_backend()
 {
     if(clctx)

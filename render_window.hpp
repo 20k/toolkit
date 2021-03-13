@@ -33,6 +33,7 @@ struct render_settings : serialisable, free_function
     bool opencl = false;
     bool vsync = false;
     bool no_decoration = false;
+    bool is_taskbar_hidden = false;
 };
 
 namespace backend_type
@@ -87,6 +88,7 @@ struct generic_backend
     virtual bool should_close(){return true;}
     virtual void close(){}
     virtual void init_screen(vec2i dim){(void)dim;}
+    virtual void set_is_hidden(bool is_hidden){(void)is_hidden;}
     virtual opencl_context* get_opencl_context(){return nullptr;}
     virtual vec2i get_window_size(){return {ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y};}
     virtual vec2i get_window_position(){return {0,0};}
