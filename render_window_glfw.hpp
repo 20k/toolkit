@@ -47,6 +47,9 @@ struct glfw_backend : generic_backend
     void poll(double maximum_sleep_s = 0) override;
     void poll_events_only(double maximum_sleep_s = 0) override;
     void poll_issue_new_frame_only() override;
+
+    void display_bind_and_clear() override;
+    void display_render() override;
     void display() override;
     void display_last_frame() override;
     bool should_close() override;

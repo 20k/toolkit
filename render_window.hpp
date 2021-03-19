@@ -83,7 +83,9 @@ struct generic_backend
     virtual void poll(double maximum_sleep_s = 0){(void)maximum_sleep_s;}
     virtual void poll_events_only(double maximum_sleep_s = 0){(void)maximum_sleep_s;}
     virtual void poll_issue_new_frame_only(){}
-    virtual void display(){}
+    virtual void display_bind_and_clear(){}
+    virtual void display_render(){}
+    virtual void display(){display_bind_and_clear(); display_render();}
     virtual void display_last_frame(){}
     virtual bool should_close(){return true;}
     virtual void close(){}

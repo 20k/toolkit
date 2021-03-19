@@ -392,7 +392,7 @@ void glfw_backend::poll(double maximum_sleep_s)
     poll_issue_new_frame_only();
 }
 
-void glfw_backend::display()
+void glfw_backend::display_bind_and_clear()
 {
     assert(ctx.window);
 
@@ -409,8 +409,6 @@ void glfw_backend::display()
         user_data->max_frames--;
     }
 
-    ImGui::Render();
-
     vec2i dim = get_window_size();
 
     glfwMakeContextCurrent(ctx.window);
@@ -420,7 +418,13 @@ void glfw_backend::display()
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx.fbo);
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
+}
 
+void glfw_backend::display_render()
+{
+    vec2i dim = get_window_size();
+
+    ImGui::Render();
     //glDrawBuffer(GL_BACK);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -457,6 +461,12 @@ void glfw_backend::display()
     }
 
     glfwSwapBuffers(ctx.window);
+}
+
+void glfw_backend::display()
+{
+    display_bind_and_clear();
+    display_render();
 }
 
 void glfw_backend::display_last_frame()
