@@ -527,6 +527,28 @@ namespace cl
 
 template<>
 inline
+void cl::args::push_back<cl::command_queue>(cl::command_queue& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_command_queue.data;
+    inf.size = sizeof(cl_command_queue);
+
+    arg_list.push_back(inf);
+}
+
+template<>
+inline
+void cl::args::push_back<cl::device_command_queue>(cl::device_command_queue& val)
+{
+    cl::arg_info inf;
+    inf.ptr = &val.native_command_queue.data;
+    inf.size = sizeof(cl_command_queue);
+
+    arg_list.push_back(inf);
+}
+
+template<>
+inline
 void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
 {
     cl::arg_info inf;
