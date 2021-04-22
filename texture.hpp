@@ -22,6 +22,9 @@ struct texture
     void load_from_memory(const uint8_t* pixels_rgba, vec2i dim);
 
     void load_from_memory(const texture_settings& settings, const uint8_t* pixels_rgba);
+
+    std::vector<vec4f> read(int mip_level = 0);
+
     vec2i get_size();
     ~texture();
 
