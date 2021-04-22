@@ -63,7 +63,9 @@ void texture::load_from_memory(const texture_settings& settings, const uint8_t* 
     }
 
     glTexImage2D(GL_TEXTURE_2D, 0, internalformat, dim.x(), dim.y(), 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels_rgba);
-    glGenerateMipmapEXT(GL_TEXTURE_2D);
+
+    if(settings.generate_mipmaps)
+        glGenerateMipmapEXT(GL_TEXTURE_2D);
 }
 
 vec2i texture::get_size()
