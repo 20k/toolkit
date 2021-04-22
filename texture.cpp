@@ -59,7 +59,7 @@ void texture::load_from_memory(const texture_settings& settings, const uint8_t* 
     }
     else
     {
-        internalformat = GL_RGBA8;
+        internalformat = GL_RGBA32F;
     }
 
     glTexImage2D(GL_TEXTURE_2D, 0, internalformat, dim.x(), dim.y(), 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels_rgba);
