@@ -863,24 +863,32 @@ void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
     }*/
 }
 
-void cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
+cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
 {
+    cl::event ret;
+
     if(acquired)
-        return;
+        return ret;
 
     acquired = true;
 
-    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, nullptr);
+    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, &ret.native_event.data);
+
+    return ret;
 }
 
-void cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
+cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
 {
+    cl::event ret;
+
     if(!acquired)
-        return;
+        return ret;
 
     acquired = false;
 
-    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, nullptr);
+    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, &ret.native_event.data);
+
+    return ret;
 }
 
 void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
