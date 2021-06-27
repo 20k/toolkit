@@ -18,7 +18,7 @@
 #include <GL/glx.h>
 #endif
 
-#define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
+#define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {printf("Got opencl error %i\n", err); throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
 
 static
 std::string read_file(const std::string& file)
@@ -80,8 +80,6 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
                     if(strstr(chBuffer, "NVIDIA") != NULL || strstr(chBuffer, "AMD") != NULL)// || strstr(chBuffer, "Intel") != NULL)
                     {
                         *clSelectedPlatformID = clPlatformIDs[i];
-
-                        //printf("Picked Platform: %s\n", chBuffer);
                     }
                 }
             }
@@ -168,7 +166,7 @@ cl::context::context()
     cl_uint num_devices = 0;
     cl_device_id devices[100] = {};
 
-    CHECK(clGetDeviceIDs(pid, CL_DEVICE_TYPE_GPU, 1, devices, &num_devices));
+    CHECK(clGetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, 1, devices, &num_devices));
 
     selected_device = devices[0];
 
