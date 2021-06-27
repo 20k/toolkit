@@ -166,7 +166,7 @@ cl::context::context()
     cl_uint num_devices = 0;
     cl_device_id devices[100] = {};
 
-    CHECK(clGetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, 1, devices, &num_devices));
+    CHECK(clGetDeviceIDs(pid, CL_DEVICE_TYPE_GPU, 1, devices, &num_devices));
 
     selected_device = devices[0];
 
