@@ -461,8 +461,8 @@ namespace cl
         void create_from_texture_with_mipmaps(GLuint texture_id, int mip_level);
         void create_from_framebuffer(GLuint framebuffer_id);
 
-        void acquire(command_queue& cqueue);
-        void unacquire(command_queue& cqueue);
+        event acquire(command_queue& cqueue);
+        event unacquire(command_queue& cqueue);
     };
 
     template<int N, typename T>
