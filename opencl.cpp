@@ -363,24 +363,26 @@ void event_memory_free(cl_event event, cl_int event_command_status, void* user_d
     delete [] (char*)user_data;
 }
 
-void cl::buffer::write_async(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+cl::event cl::buffer::write_async(cl::command_queue& write_on, const char* ptr, int64_t bytes)
 {
     assert(bytes <= alloc_size);
 
-    cl_event evt;
+    cl::event evt;
 
     char* nptr = new char[bytes];
 
     memcpy(nptr, ptr, bytes);
 
-    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, nptr, 0, nullptr, &evt);
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, nptr, 0, nullptr, &evt.native_event.data);
 
-    clSetEventCallback(evt, CL_COMPLETE, &event_memory_free, nptr);
+    clSetEventCallback(evt.native_event.data, CL_COMPLETE, &event_memory_free, nptr);
 
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not write");
     }
+
+    return evt;
 }
 
 void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
