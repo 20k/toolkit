@@ -288,7 +288,7 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
 
 void cl::program::build(context& ctx, const std::string& options)
 {
-    std::string build_options = "-cl-fast-relaxed-math -cl-no-signed-zeros -cl-single-precision-constant -cl-denorms-are-zero " + options;
+    std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
 
     cl_int build_status = clBuildProgram(native_program.data, 1, &ctx.selected_device, build_options.c_str(), nullptr, nullptr);
 
