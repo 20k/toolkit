@@ -132,6 +132,7 @@ namespace cl
 
         void block();
         bool is_finished();
+        void set_completion_callback(void (CL_CALLBACK* pfn_notify)(cl_event event, cl_int event_command_status, void *user_data), void* userdata);
     };
 
     struct program;
@@ -225,7 +226,7 @@ namespace cl
 
         void read(command_queue& read_on, char* ptr, int64_t bytes);
 
-        event read_async(command_queue& read_on, char* ptr, int64_t bytes);
+        event read_async(command_queue& read_on, char* ptr, int64_t bytes, const std::vector<cl::event>& wait_on);
 
         template<typename T>
         read_info<T> read_async(command_queue& read_on, int64_t elements)
@@ -236,7 +237,7 @@ namespace cl
                 return ret;
 
             ret.data = new T[elements];
-            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T));
+            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T), {});
 
             return ret;
         }
