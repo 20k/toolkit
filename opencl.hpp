@@ -75,7 +75,7 @@ namespace cl
             return *this;
         }
 
-        base<T, U, V>(base<T, U, V>&& other)
+        base(base<T, U, V>&& other)
         {
             data = other.data;
             other.data = nullptr;
