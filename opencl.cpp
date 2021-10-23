@@ -118,6 +118,15 @@ void cl::event::set_completion_callback(void (CL_CALLBACK* pfn_notify)(cl_event 
     clSetEventCallback(native_event.data, CL_COMPLETE, pfn_notify, userdata);
 }
 
+int count_arguments(cl_kernel k)
+{
+    cl_uint argc = 0;
+
+    CHECK(clGetKernelInfo(k, CL_KERNEL_NUM_ARGS, sizeof(cl_uint), (void*)&argc, nullptr));
+
+    return argc;
+}
+
 cl::kernel::kernel()
 {
 
@@ -140,6 +149,8 @@ cl::kernel::kernel(cl::program& p, const std::string& kname)
     {
         native_kernel.data = ret;
     }
+
+    argument_count = count_arguments(ret);
 }
 
 cl::kernel::kernel(cl_kernel k)
@@ -159,6 +170,8 @@ cl::kernel::kernel(cl_kernel k)
     name.resize(ret + 1);
 
     clGetKernelInfo(k, CL_KERNEL_FUNCTION_NAME, name.size(), &name[0], nullptr);
+
+    argument_count = count_arguments(k);
 }
 
 cl::context::context()
@@ -655,6 +668,9 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
             continue;
 
         cl::kernel& kern = kernel_it->second;
+
+        if(pack.arg_list.size() != kern.argument_count)
+            throw std::runtime_error("Called kernel " + kern.name + " with wrong number of arguments");
 
         for(int i=0; i < (int)pack.arg_list.size(); i++)
         {

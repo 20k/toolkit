@@ -146,6 +146,7 @@ namespace cl
         kernel(cl_kernel k); ///non retaining
 
         std::string name;
+        int argument_count = 0;
     };
 
     struct program;
