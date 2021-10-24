@@ -894,7 +894,15 @@ void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
     }*/
 }
 
-cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
+cl_event* get_event_pointer(const std::vector<cl::event>& events)
+{
+    if(events.size() > 0)
+        return (cl_event*)&events[0];
+
+    return nullptr;
+}
+
+cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)
 {
     cl::event ret;
 
@@ -903,12 +911,17 @@ cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
 
     acquired = true;
 
-    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, &ret.native_event.data);
+    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), get_event_pointer(events), &ret.native_event.data);
 
     return ret;
 }
 
-cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
+cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
+{
+    return acquire(cqueue, {});
+}
+
+cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)
 {
     cl::event ret;
 
@@ -917,9 +930,14 @@ cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
 
     acquired = false;
 
-    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, &ret.native_event.data);
+    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), get_event_pointer(events), &ret.native_event.data);
 
     return ret;
+}
+
+cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
+{
+    return unacquire(cqueue, {});
 }
 
 void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)

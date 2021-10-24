@@ -465,6 +465,9 @@ namespace cl
 
         event acquire(command_queue& cqueue);
         event unacquire(command_queue& cqueue);
+
+        event acquire(command_queue& cqueue, const std::vector<cl::event>& events);
+        event unacquire(command_queue& cqueue, const std::vector<cl::event>& events);
     };
 
     template<int N, typename T>
