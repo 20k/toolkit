@@ -106,11 +106,11 @@ namespace cl
     struct arg_base
     {
         virtual const void* fetch_ptr() = 0;
-        virtual size_t fetch_size();
+        virtual size_t fetch_size() = 0;
         virtual ~arg_base(){}
     };
 
-    struct arg_view : arg_base
+    /*struct arg_view : arg_base
     {
         const void* ptr = nullptr;
         size_t size = 0;
@@ -126,57 +126,67 @@ namespace cl
         }
 
         arg_view(){}
-    };
+    };*/
 
-    template<typename T>
+    template<typename T, typename U>
     struct arg_typed : arg_base
     {
-        T val;
+        ///keep the underlying value alive
+        std::unique_ptr<T> val;
+        ///pointer to the data to pass to the kernel
+        U* data;
 
-        void take(T&& v)
+        void take(std::unique_ptr<T>&& v, U* data_ptr)
         {
             val = std::move(v);
+            data = data_ptr;
         }
 
         const void* fetch_ptr() override
         {
-            return val;
+            return data;
         }
 
         size_t fetch_size() override
         {
-            return sizeof(T);
+            return sizeof(U);
         }
 
         ~arg_typed(){}
     };
 
+    template<typename T, typename U>
+    inline
+    std::shared_ptr<arg_base> build_from_args(std::unique_ptr<T>&& ptr, U* data)
+    {
+        std::shared_ptr<arg_typed<T, U>> shared = std::make_shared<arg_typed<T, U>>();
+
+        shared->take(std::move(ptr), data);
+
+        return std::dynamic_pointer_cast<arg_base>(shared);
+    }
+
     struct args
     {
-        std::vector<std::variant<arg_view, std::unique_ptr<arg_base>>> arg_list;
+        std::vector<std::shared_ptr<arg_base>> arg_list;
 
         template<typename T>
         inline
-        void push_back(T& val)
+        void push_back(const T& val)
         {
-            arg_view inf;
-            inf.ptr = &val;
-            inf.size = sizeof(T);
+            std::unique_ptr<T> v = std::make_unique<T>(val);
+            T* data = v.get();
 
-            arg_list.push_back(inf);
+            std::shared_ptr<arg_base> base = build_from_args(std::move(v), data);
+
+            push_arg(base);
         }
 
-        template<typename T>
-        inline
-        void push_back(T&& val)
+        void push_arg(const std::shared_ptr<arg_base>& base)
         {
-            arg_typed<T>* inf = new arg_typed<T>;
-            inf.take(std::move(val));
-
-            arg_list.push_back(std::unique_ptr<arg_base>(inf));
+            arg_list.push_back(base);
         }
     };
-
 
     struct event
     {
@@ -583,79 +593,72 @@ namespace cl
 
 template<>
 inline
-void cl::args::push_back<cl::command_queue>(cl::command_queue& val)
+void cl::args::push_back<cl::command_queue>(const cl::command_queue& val)
 {
-    cl::arg_view inf;
-    inf.ptr = &val.native_command_queue.data;
-    inf.size = sizeof(cl_command_queue);
+    std::unique_ptr<cl::command_queue> uptr = std::make_unique<cl::command_queue>(val);
+    cl_command_queue* ptr = &uptr->native_command_queue.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::device_command_queue>(cl::device_command_queue& val)
+void cl::args::push_back<cl::device_command_queue>(const cl::device_command_queue& val)
 {
-    cl::arg_view inf;
-    inf.ptr = &val.native_command_queue.data;
-    inf.size = sizeof(cl_command_queue);
+    std::unique_ptr<cl::device_command_queue> uptr = std::make_unique<cl::device_command_queue>(val);
+    cl_command_queue* ptr = &uptr->native_command_queue.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
+void cl::args::push_back<cl::mem_object>(const cl::mem_object& val)
 {
-    cl::arg_view inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::mem_object> uptr = std::make_unique<cl::mem_object>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::buffer>(cl::buffer& val)
+void cl::args::push_back<cl::buffer>(const cl::buffer& val)
 {
-    cl::arg_view inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::buffer> uptr = std::make_unique<cl::buffer>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
+void cl::args::push_back<cl::gl_rendertexture>(const cl::gl_rendertexture& val)
 {
-    cl::arg_view inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::gl_rendertexture> uptr = std::make_unique<cl::gl_rendertexture>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::image>(cl::image& val)
+void cl::args::push_back<cl::image>(const cl::image& val)
 {
-    cl::arg_view inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::image> uptr = std::make_unique<cl::image>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::image_with_mipmaps>(cl::image_with_mipmaps& val)
+void cl::args::push_back<cl::image_with_mipmaps>(const cl::image_with_mipmaps& val)
 {
-    cl::arg_view inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::image_with_mipmaps> uptr = std::make_unique<cl::image_with_mipmaps>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 #endif // OPENCL_HPP_INCLUDED

@@ -674,15 +674,7 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
 
         for(int i=0; i < (int)pack.arg_list.size(); i++)
         {
-            if(auto* pval = std::get_if<cl::arg_view>(&pack.arg_list[i]))
-            {
-                clSetKernelArg(kern.native_kernel.data, i, pval->fetch_size(), pval->fetch_ptr());
-            }
-
-            if(auto* pval = std::get_if<std::unique_ptr<cl::arg_base>>(&pack.arg_list[i]))
-            {
-                clSetKernelArg(kern.native_kernel.data, i, (*pval)->fetch_size(), (*pval)->fetch_ptr());
-            }
+            clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i]->fetch_size(), pack.arg_list[i]->fetch_ptr());
         }
 
         int dim = global_ws.size();
