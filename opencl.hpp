@@ -321,6 +321,9 @@ namespace cl
 
             return ret;
         }
+
+        cl::buffer as_device_read_only();
+        cl::buffer as_device_write_only();
     };
 
     struct image_base : mem_object

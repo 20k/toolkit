@@ -453,6 +453,42 @@ void cl::buffer::set_to_zero(cl::command_queue& write_on)
     }
 }
 
+cl::buffer cl::buffer::as_device_read_only()
+{
+    cl::buffer buf = *this;
+
+    cl_buffer_region region;
+    region.origin = 0;
+    region.size = alloc_size;
+
+    cl_int err = 0;
+    cl_mem as_readable = clCreateSubBuffer(native_mem_object.data, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+
+    assert(err == 0);
+
+    buf.native_mem_object.consume(as_readable);
+
+    return buf;
+}
+
+cl::buffer cl::buffer::as_device_write_only()
+{
+    cl::buffer buf = *this;
+
+    cl_buffer_region region;
+    region.origin = 0;
+    region.size = alloc_size;
+
+    cl_int err = 0;
+    cl_mem as_readable = clCreateSubBuffer(native_mem_object.data, CL_MEM_WRITE_ONLY | CL_MEM_HOST_NO_ACCESS, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+
+    assert(err == 0);
+
+    buf.native_mem_object.consume(as_readable);
+
+    return buf;
+}
+
 cl::image::image(cl::context& ctx)
 {
     native_context = ctx.native_context;
