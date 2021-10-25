@@ -669,12 +669,20 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
 
         cl::kernel& kern = kernel_it->second;
 
-        if(pack.arg_list.size() != kern.argument_count)
+        if((int)pack.arg_list.size() != kern.argument_count)
             throw std::runtime_error("Called kernel " + kern.name + " with wrong number of arguments");
 
         for(int i=0; i < (int)pack.arg_list.size(); i++)
         {
-            clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i].size, pack.arg_list[i].ptr);
+            if(auto* pval = std::get_if<cl::arg_view>(&pack.arg_list[i]))
+            {
+                clSetKernelArg(kern.native_kernel.data, i, pval->fetch_size(), pval->fetch_ptr());
+            }
+
+            if(auto* pval = std::get_if<std::unique_ptr<cl::arg_base>>(&pack.arg_list[i]))
+            {
+                clSetKernelArg(kern.native_kernel.data, i, (*pval)->fetch_size(), (*pval)->fetch_ptr());
+            }
         }
 
         int dim = global_ws.size();

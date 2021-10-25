@@ -11,7 +11,7 @@
 #include <array>
 #include <vec/vec.hpp>
 #include <assert.h>
-#include <functional>
+#include <variant>
 
 namespace cl
 {
@@ -103,25 +103,77 @@ namespace cl
         }
     };
 
-    struct arg_info
+    struct arg_base
+    {
+        virtual const void* fetch_ptr() = 0;
+        virtual size_t fetch_size();
+        virtual ~arg_base(){}
+    };
+
+    struct arg_view : arg_base
     {
         const void* ptr = nullptr;
-        int64_t size = 0;
+        size_t size = 0;
+
+        const void* fetch_ptr() override
+        {
+            return ptr;
+        }
+
+        size_t fetch_size() override
+        {
+            return size;
+        }
+
+        arg_view(){}
+    };
+
+    template<typename T>
+    struct arg_typed : arg_base
+    {
+        T val;
+
+        void take(T&& v)
+        {
+            val = std::move(v);
+        }
+
+        const void* fetch_ptr() override
+        {
+            return val;
+        }
+
+        size_t fetch_size() override
+        {
+            return sizeof(T);
+        }
+
+        ~arg_typed(){}
     };
 
     struct args
     {
-        std::vector<arg_info> arg_list;
+        std::vector<std::variant<arg_view, std::unique_ptr<arg_base>>> arg_list;
 
         template<typename T>
         inline
         void push_back(T& val)
         {
-            arg_info inf;
+            arg_view inf;
             inf.ptr = &val;
             inf.size = sizeof(T);
 
             arg_list.push_back(inf);
+        }
+
+        template<typename T>
+        inline
+        void push_back(T&& val)
+        {
+            arg_typed<T>* inf = new arg_typed<T>;
+            inf.take(std::move(val));
+
+            arg_list.push_back(std::unique_ptr<arg_base>(inf));
         }
     };
 
@@ -384,7 +436,6 @@ namespace cl
         }*/
     };
 
-
     struct image_with_mipmaps : image_base
     {
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -534,7 +585,7 @@ template<>
 inline
 void cl::args::push_back<cl::command_queue>(cl::command_queue& val)
 {
-    cl::arg_info inf;
+    cl::arg_view inf;
     inf.ptr = &val.native_command_queue.data;
     inf.size = sizeof(cl_command_queue);
 
@@ -545,7 +596,7 @@ template<>
 inline
 void cl::args::push_back<cl::device_command_queue>(cl::device_command_queue& val)
 {
-    cl::arg_info inf;
+    cl::arg_view inf;
     inf.ptr = &val.native_command_queue.data;
     inf.size = sizeof(cl_command_queue);
 
@@ -556,7 +607,7 @@ template<>
 inline
 void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
 {
-    cl::arg_info inf;
+    cl::arg_view inf;
     inf.ptr = &val.native_mem_object.data;
     inf.size = sizeof(cl_mem);
 
@@ -567,7 +618,7 @@ template<>
 inline
 void cl::args::push_back<cl::buffer>(cl::buffer& val)
 {
-    cl::arg_info inf;
+    cl::arg_view inf;
     inf.ptr = &val.native_mem_object.data;
     inf.size = sizeof(cl_mem);
 
@@ -578,7 +629,7 @@ template<>
 inline
 void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
 {
-    cl::arg_info inf;
+    cl::arg_view inf;
     inf.ptr = &val.native_mem_object.data;
     inf.size = sizeof(cl_mem);
 
@@ -589,7 +640,7 @@ template<>
 inline
 void cl::args::push_back<cl::image>(cl::image& val)
 {
-    cl::arg_info inf;
+    cl::arg_view inf;
     inf.ptr = &val.native_mem_object.data;
     inf.size = sizeof(cl_mem);
 
@@ -600,7 +651,7 @@ template<>
 inline
 void cl::args::push_back<cl::image_with_mipmaps>(cl::image_with_mipmaps& val)
 {
-    cl::arg_info inf;
+    cl::arg_view inf;
     inf.ptr = &val.native_mem_object.data;
     inf.size = sizeof(cl_mem);
 
