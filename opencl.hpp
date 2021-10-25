@@ -134,7 +134,7 @@ namespace cl
         ///keep the underlying value alive
         std::unique_ptr<T> val;
         ///pointer to the data to pass to the kernel
-        U* data;
+        U* data = nullptr;
 
         void take(std::unique_ptr<T>&& v, U* data_ptr)
         {
