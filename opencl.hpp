@@ -285,7 +285,7 @@ namespace cl
             write(write_on, (const char*)&data[0], data.size() * sizeof(T));
         }
 
-        void write_async(command_queue& write_on, const char* ptr, int64_t bytes);
+        event write_async(command_queue& write_on, const char* ptr, int64_t bytes);
 
         void read(command_queue& read_on, char* ptr, int64_t bytes);
 
