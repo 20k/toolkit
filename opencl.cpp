@@ -174,6 +174,42 @@ cl::kernel::kernel(cl_kernel k)
     argument_count = count_arguments(k);
 }
 
+void cl::kernel::set_args(cl::args& pack)
+{
+    if((int)pack.arg_list.size() != argument_count)
+        throw std::runtime_error("Called kernel " + name + " with wrong number of arguments");
+
+    for(int i=0; i < (int)pack.arg_list.size(); i++)
+    {
+        clSetKernelArg(native_kernel.data, i, pack.arg_list[i]->fetch_size(), pack.arg_list[i]->fetch_ptr());
+    }
+}
+
+cl_program cl::kernel::fetch_program()
+{
+    cl_program ret;
+
+    clGetKernelInfo(native_kernel.data, CL_KERNEL_PROGRAM, sizeof(cl_program), &ret, nullptr);
+
+    return ret;
+}
+
+cl::kernel cl::kernel::clone()
+{
+    cl_program prog = fetch_program();
+
+    cl_int err = 0;
+
+    cl_kernel kern = clCreateKernel(prog, name.c_str(), &err);
+
+    if(err != CL_SUCCESS)
+        throw std::runtime_error("Could not clone kernel " + name + " with error " + std::to_string(err));
+
+    cl::kernel ret(kern);
+
+    return ret;
+}
+
 cl::context::context()
 {
     kernels = std::make_shared<std::vector<std::map<std::string, kernel>>>();
@@ -692,10 +728,76 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
     native_context = ctx.native_context;
 }
 
-cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
 {
     cl::event ret;
 
+    int dim = global_ws.size();
+
+    size_t g_ws[3] = {0};
+    size_t l_ws[3] = {0};
+
+    for(int i=0; i < dim; i++)
+    {
+        l_ws[i] = local_ws[i];
+        g_ws[i] = global_ws[i];
+
+        if(l_ws[i] == 0)
+            continue;
+
+        if((g_ws[i] % l_ws[i]) != 0)
+        {
+            int rem = g_ws[i] % l_ws[i];
+
+            g_ws[i] -= rem;
+            g_ws[i] += l_ws[i];
+        }
+
+        if(g_ws[i] == 0)
+        {
+            g_ws[i] += l_ws[i];
+        }
+    }
+
+    static_assert(sizeof(cl::event) == sizeof(cl_event));
+
+    cl_int err = CL_SUCCESS;
+
+    #ifndef GPU_PROFILE
+    if(deps.size() > 0)
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
+    else
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+    #else
+
+    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+
+    cl_ulong start;
+    cl_ulong finish;
+
+    block();
+
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
+
+    cl_ulong diff = finish - start;
+
+    double ddiff = diff / 1000. / 1000.;
+
+    std::cout << "kernel " << kern.name << " ms " << ddiff << std::endl;
+
+    #endif // GPU_PROFILE
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kern.name << std::endl;
+    }
+
+    return ret;
+}
+
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+{
     assert(global_ws.size() == local_ws.size());
 
     for(auto& kerns : *kernels)
@@ -707,76 +809,9 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
 
         cl::kernel& kern = kernel_it->second;
 
-        if((int)pack.arg_list.size() != kern.argument_count)
-            throw std::runtime_error("Called kernel " + kern.name + " with wrong number of arguments");
+        kern.set_args(pack);
 
-        for(int i=0; i < (int)pack.arg_list.size(); i++)
-        {
-            clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i]->fetch_size(), pack.arg_list[i]->fetch_ptr());
-        }
-
-        int dim = global_ws.size();
-
-        size_t g_ws[3] = {0};
-        size_t l_ws[3] = {0};
-
-        for(int i=0; i < dim; i++)
-        {
-            l_ws[i] = local_ws[i];
-            g_ws[i] = global_ws[i];
-
-            if(l_ws[i] == 0)
-                continue;
-
-            if((g_ws[i] % l_ws[i]) != 0)
-            {
-                int rem = g_ws[i] % l_ws[i];
-
-                g_ws[i] -= rem;
-                g_ws[i] += l_ws[i];
-            }
-
-            if(g_ws[i] == 0)
-            {
-                g_ws[i] += l_ws[i];
-            }
-        }
-
-        static_assert(sizeof(cl::event) == sizeof(cl_event));
-
-        cl_int err = CL_SUCCESS;
-
-        #ifndef GPU_PROFILE
-        if(deps.size() > 0)
-            err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
-        else
-            err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
-        #else
-
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
-
-        cl_ulong start;
-        cl_ulong finish;
-
-        block();
-
-        clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
-        clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
-
-        cl_ulong diff = finish - start;
-
-        double ddiff = diff / 1000. / 1000.;
-
-        std::cout << "kernel " << kname << " ms " << ddiff << std::endl;
-
-        #endif // GPU_PROFILE
-
-        if(err != CL_SUCCESS)
-        {
-            std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kname << std::endl;
-        }
-
-        return ret;
+        return exec(kern, global_ws, local_ws, deps);
     }
 
     throw std::runtime_error("Kernel not found in any program");

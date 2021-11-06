@@ -197,7 +197,16 @@ namespace cl
         void set_completion_callback(void (CL_CALLBACK* pfn_notify)(cl_event event, cl_int event_command_status, void *user_data), void* userdata);
     };
 
-    struct program;
+    struct context;
+
+    struct program
+    {
+        base<cl_program, clRetainProgram, clReleaseProgram> native_program;
+
+        program(context& ctx, const std::string& data, bool is_file = true);
+        program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
+        void build(context& ctx, const std::string& options);
+    };
 
     struct kernel
     {
@@ -209,9 +218,12 @@ namespace cl
 
         std::string name;
         int argument_count = 0;
-    };
 
-    struct program;
+        void set_args(cl::args& pack);
+        cl_program fetch_program();
+
+        kernel clone();
+    };
 
     struct context
     {
@@ -226,15 +238,6 @@ namespace cl
 
         void register_program(program& p);
         void deregister_program(int idx);
-    };
-
-    struct program
-    {
-        base<cl_program, clRetainProgram, clReleaseProgram> native_program;
-
-        program(context& ctx, const std::string& data, bool is_file = true);
-        program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
-        void build(context& ctx, const std::string& options);
     };
 
     struct command_queue;
@@ -499,6 +502,7 @@ namespace cl
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 
+        event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
         void block();
