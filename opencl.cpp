@@ -212,7 +212,7 @@ cl::kernel cl::kernel::clone()
 
 cl::context::context()
 {
-    kernels = std::make_shared<std::vector<std::map<std::string, kernel>>>();
+    kernels = std::make_shared<std::vector<std::map<std::string, kernel, std::less<>>>>();
 
     cl_platform_id pid = {};
     get_platform_ids(&pid);
@@ -272,7 +272,7 @@ void cl::context::register_program(cl::program& p)
 
     cl_kernels.resize(num);
 
-    std::map<std::string, cl::kernel>& which = kernels->emplace_back();
+    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
 
     for(cl_kernel& k : cl_kernels)
     {
@@ -295,6 +295,19 @@ void cl::context::deregister_program(int idx)
 
     kernels->erase(kernels->begin() + idx);
     programs.erase(programs.begin() + idx);
+}
+
+cl::kernel cl::context::fetch_kernel(std::string_view name)
+{
+    for(auto& program_map : *kernels)
+    {
+        if(auto it = program_map.find(name); it != program_map.end())
+        {
+            return it->second;
+        }
+    }
+
+    throw std::runtime_error("no such kernel in context");
 }
 
 cl::program::program(context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
