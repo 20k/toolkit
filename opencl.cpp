@@ -92,6 +92,15 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
     }
 }
 
+static
+cl_event* get_event_pointer(const std::vector<cl::event>& events)
+{
+    if(events.size() > 0)
+        return (cl_event*)&events[0];
+
+    return nullptr;
+}
+
 void cl::event::block()
 {
     if(native_event.data == nullptr)
@@ -765,6 +774,15 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
     native_context = ctx.native_context;
 }
 
+cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
+{
+    cl::event ret;
+
+    CHECK(clEnqueueMarkerWithWaitList(native_command_queue.data, deps.size(), get_event_pointer(deps), &ret.native_event.data));
+
+    return ret;
+}
+
 cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
 {
     cl::event ret;
@@ -1002,14 +1020,6 @@ void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
 
         std::cout << "err? " << err << std::endl;
     }*/
-}
-
-cl_event* get_event_pointer(const std::vector<cl::event>& events)
-{
-    if(events.size() > 0)
-        return (cl_event*)&events[0];
-
-    return nullptr;
 }
 
 cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)

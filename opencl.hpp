@@ -516,6 +516,8 @@ namespace cl
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 
+        event enqueue_marker(const std::vector<event>& deps);
+
         event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
