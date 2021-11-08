@@ -14,6 +14,7 @@
 #include <variant>
 #include <string_view>
 #include <atomic>
+#include <thread>
 
 namespace cl
 {
@@ -205,8 +206,8 @@ namespace cl
     {
         struct async_context
         {
+            std::thread thrd;
             std::atomic<cl_device_id> selected_device{0};
-            std::atomic_bool is_done{0};
         };
 
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
@@ -217,7 +218,6 @@ namespace cl
 
         void build(context& ctx, const std::string& options);
         void ensure_built();
-        static void callback(cl_program program, void* user_data);
     };
 
     struct kernel

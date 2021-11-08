@@ -11,7 +11,6 @@
 #include <fstream>
 #include <iostream>
 #include <assert.h>
-#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -386,23 +385,20 @@ void debug_build_status(cl::program& prog)
 void cl::program::build(context& ctx, const std::string& options)
 {
     async->selected_device = ctx.selected_device;
-
     std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
 
-    cl_int build_status = clBuildProgram(native_program.data, 1, &ctx.selected_device, build_options.c_str(), callback, async.get());
+    cl_program prog = native_program.data;
+    cl_device_id selected_device = ctx.selected_device;
 
-    if(build_status != CL_SUCCESS)
+    async->thrd = std::thread([prog, selected_device, build_options]()
     {
-        debug_build_status(*this);
-    }
+        clBuildProgram(prog, 1, &selected_device, build_options.c_str(), nullptr, nullptr);
+    });
 }
 
 void cl::program::ensure_built()
 {
-    while(!async->is_done)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
+    async->thrd.join();
 
     cl_build_status status;
     clGetProgramBuildInfo(native_program.data, async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
@@ -411,13 +407,6 @@ void cl::program::ensure_built()
     {
         debug_build_status(*this);
     }
-}
-
-void cl::program::callback(cl_program program, void* user_data)
-{
-    async_context* async = (async_context*)user_data;
-
-    async->is_done = 1;
 }
 
 cl::buffer::buffer(cl::context& ctx)
