@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <assert.h>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -134,6 +135,8 @@ cl::kernel::kernel()
 
 cl::kernel::kernel(cl::program& p, const std::string& kname)
 {
+    p.ensure_built();
+
     name = kname;
 
     cl_int err;
@@ -254,6 +257,8 @@ cl::context::context()
 
 void cl::context::register_program(cl::program& p)
 {
+    p.ensure_built();
+
     programs.push_back(p);
 
     cl_uint num = 0;
@@ -320,6 +325,8 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     if(data.size() == 0)
         throw std::runtime_error("No Program Data (0 length data vector)");
 
+    async = std::make_shared<async_context>();
+
     if(is_file)
     {
         for(const auto& i : data)
@@ -353,36 +360,64 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
+void debug_build_status(cl::program& prog)
+{
+    cl_build_status bstatus;
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+
+    std::cout << "Build Status: " << bstatus << std::endl;
+
+    assert(bstatus == CL_BUILD_ERROR);
+
+    std::string log;
+    size_t log_size;
+
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+
+    log.resize(log_size + 1);
+
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
+
+    std::cout << log << std::endl;
+
+    throw std::runtime_error("Failed to build");
+}
+
 void cl::program::build(context& ctx, const std::string& options)
 {
+    async->selected_device = ctx.selected_device;
+
     std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
 
-    cl_int build_status = clBuildProgram(native_program.data, 1, &ctx.selected_device, build_options.c_str(), nullptr, nullptr);
+    cl_int build_status = clBuildProgram(native_program.data, 1, &ctx.selected_device, build_options.c_str(), callback, async.get());
 
     if(build_status != CL_SUCCESS)
     {
-        std::cout << "Build Error: " << build_status << std::endl;
-
-        cl_build_status bstatus;
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
-
-        std::cout << "Build Status: " << bstatus << std::endl;
-
-        assert(bstatus == CL_BUILD_ERROR);
-
-        std::string log;
-        size_t log_size;
-
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
-
-        log.resize(log_size + 1);
-
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
-
-        std::cout << log << std::endl;
-
-        throw std::runtime_error("Failed to build");
+        debug_build_status(*this);
     }
+}
+
+void cl::program::ensure_built()
+{
+    while(!async->is_done)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    cl_build_status status;
+    clGetProgramBuildInfo(native_program.data, async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
+
+    if(status != CL_SUCCESS)
+    {
+        debug_build_status(*this);
+    }
+}
+
+void cl::program::callback(cl_program program, void* user_data)
+{
+    async_context* async = (async_context*)user_data;
+
+    async->is_done = 1;
 }
 
 cl::buffer::buffer(cl::context& ctx)

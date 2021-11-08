@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <variant>
 #include <string_view>
+#include <atomic>
 
 namespace cl
 {
@@ -202,11 +203,21 @@ namespace cl
 
     struct program
     {
+        struct async_context
+        {
+            std::atomic<cl_device_id> selected_device{0};
+            std::atomic_bool is_done{0};
+        };
+
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
+        std::shared_ptr<async_context> async;
 
         program(context& ctx, const std::string& data, bool is_file = true);
         program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
+
         void build(context& ctx, const std::string& options);
+        void ensure_built();
+        static void callback(cl_program program, void* user_data);
     };
 
     struct kernel
