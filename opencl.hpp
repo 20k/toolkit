@@ -323,6 +323,15 @@ namespace cl
         }
 
         void set_to_zero(command_queue& write_on);
+        void fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size);
+
+        template<typename T>
+        void fill(command_queue& write_on, const T& value)
+        {
+            assert((alloc_size % sizeof(T)) == 0);
+
+            fill(write_on, (void*)&value, sizeof(T), alloc_size);
+        }
 
         template<typename T>
         std::vector<T> read(command_queue& read_on)

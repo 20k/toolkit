@@ -535,6 +535,16 @@ void cl::buffer::set_to_zero(cl::command_queue& write_on)
     }
 }
 
+void cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size)
+{
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, 0, nullptr, nullptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not fill buffer");
+    }
+}
+
 cl::buffer cl::buffer::as_device_read_only()
 {
     cl::buffer buf = *this;
