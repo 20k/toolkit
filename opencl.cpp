@@ -879,7 +879,7 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
         return exec(kern, global_ws, local_ws, deps);
     }
 
-    throw std::runtime_error("Kernel not found in any program");
+    throw std::runtime_error("Kernel " + kname + " not found in any program");
 }
 
 cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
