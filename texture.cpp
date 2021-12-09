@@ -59,11 +59,34 @@ void texture::load_from_memory(const texture_settings& settings, const uint8_t* 
     }
     else
     {
-        internalformat = GL_RGBA8;
+        internalformat = GL_RGBA32F;
     }
 
     glTexImage2D(GL_TEXTURE_2D, 0, internalformat, dim.x(), dim.y(), 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels_rgba);
-    glGenerateMipmapEXT(GL_TEXTURE_2D);
+
+    if(settings.generate_mipmaps)
+        glGenerateMipmapEXT(GL_TEXTURE_2D);
+}
+
+std::vector<vec4f> texture::read(int mip_level)
+{
+    assert(handle != 0);
+
+    glBindTexture(GL_TEXTURE_2D, handle);
+
+    int width = 0;
+    int height = 0;
+
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_WIDTH, &width);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, mip_level, GL_TEXTURE_HEIGHT, &height);
+
+    std::vector<vec4f> ret;
+
+    ret.resize(width * height);
+
+    glGetTexImage(GL_TEXTURE_2D, mip_level, GL_RGBA, GL_FLOAT, &ret[0]);
+
+    return ret;
 }
 
 vec2i texture::get_size()

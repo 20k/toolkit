@@ -11,7 +11,10 @@
 #include <array>
 #include <vec/vec.hpp>
 #include <assert.h>
-#include <functional>
+#include <variant>
+#include <string_view>
+#include <atomic>
+#include <thread>
 
 namespace cl
 {
@@ -75,7 +78,7 @@ namespace cl
             return *this;
         }
 
-        base<T, U, V>(base<T, U, V>&& other)
+        base(base<T, U, V>&& other)
         {
             data = other.data;
             other.data = nullptr;
@@ -103,28 +106,90 @@ namespace cl
         }
     };
 
-    struct arg_info
+    struct arg_base
+    {
+        virtual const void* fetch_ptr() = 0;
+        virtual size_t fetch_size() = 0;
+        virtual ~arg_base(){}
+    };
+
+    /*struct arg_view : arg_base
     {
         const void* ptr = nullptr;
-        int64_t size = 0;
+        size_t size = 0;
+
+        const void* fetch_ptr() override
+        {
+            return ptr;
+        }
+
+        size_t fetch_size() override
+        {
+            return size;
+        }
+
+        arg_view(){}
+    };*/
+
+    template<typename T, typename U>
+    struct arg_typed : arg_base
+    {
+        ///keep the underlying value alive
+        std::unique_ptr<T> val;
+        ///pointer to the data to pass to the kernel
+        U* data = nullptr;
+
+        void take(std::unique_ptr<T>&& v, U* data_ptr)
+        {
+            val = std::move(v);
+            data = data_ptr;
+        }
+
+        const void* fetch_ptr() override
+        {
+            return data;
+        }
+
+        size_t fetch_size() override
+        {
+            return sizeof(U);
+        }
+
+        ~arg_typed(){}
     };
+
+    template<typename T, typename U>
+    inline
+    std::shared_ptr<arg_base> build_from_args(std::unique_ptr<T>&& ptr, U* data)
+    {
+        std::shared_ptr<arg_typed<T, U>> shared = std::make_shared<arg_typed<T, U>>();
+
+        shared->take(std::move(ptr), data);
+
+        return std::dynamic_pointer_cast<arg_base>(shared);
+    }
 
     struct args
     {
-        std::vector<arg_info> arg_list;
+        std::vector<std::shared_ptr<arg_base>> arg_list;
 
         template<typename T>
         inline
-        void push_back(T& val)
+        void push_back(const T& val)
         {
-            arg_info inf;
-            inf.ptr = &val;
-            inf.size = sizeof(T);
+            std::unique_ptr<T> v = std::make_unique<T>(val);
+            T* data = v.get();
 
-            arg_list.push_back(inf);
+            std::shared_ptr<arg_base> base = build_from_args(std::move(v), data);
+
+            push_arg(base);
+        }
+
+        void push_arg(const std::shared_ptr<arg_base>& base)
+        {
+            arg_list.push_back(base);
         }
     };
-
 
     struct event
     {
@@ -132,9 +197,28 @@ namespace cl
 
         void block();
         bool is_finished();
+        void set_completion_callback(void (CL_CALLBACK* pfn_notify)(cl_event event, cl_int event_command_status, void *user_data), void* userdata);
     };
 
-    struct program;
+    struct context;
+
+    struct program
+    {
+        struct async_context
+        {
+            std::thread thrd;
+            std::atomic<cl_device_id> selected_device{0};
+        };
+
+        base<cl_program, clRetainProgram, clReleaseProgram> native_program;
+        std::shared_ptr<async_context> async;
+
+        program(context& ctx, const std::string& data, bool is_file = true);
+        program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
+
+        void build(context& ctx, const std::string& options);
+        void ensure_built();
+    };
 
     struct kernel
     {
@@ -145,14 +229,18 @@ namespace cl
         kernel(cl_kernel k); ///non retaining
 
         std::string name;
-    };
+        int argument_count = 0;
 
-    struct program;
+        void set_args(cl::args& pack);
+        cl_program fetch_program();
+
+        kernel clone();
+    };
 
     struct context
     {
         std::vector<program> programs;
-        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
         cl_device_id selected_device;
 
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -162,15 +250,8 @@ namespace cl
 
         void register_program(program& p);
         void deregister_program(int idx);
-    };
 
-    struct program
-    {
-        base<cl_program, clRetainProgram, clReleaseProgram> native_program;
-
-        program(context& ctx, const std::string& data, bool is_file = true);
-        program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
-        void build(context& ctx, const std::string& options);
+        kernel fetch_kernel(std::string_view name);
     };
 
     struct command_queue;
@@ -221,11 +302,11 @@ namespace cl
             write(write_on, (const char*)&data[0], data.size() * sizeof(T));
         }
 
-        void write_async(command_queue& write_on, const char* ptr, int64_t bytes);
+        event write_async(command_queue& write_on, const char* ptr, int64_t bytes);
 
         void read(command_queue& read_on, char* ptr, int64_t bytes);
 
-        event read_async(command_queue& read_on, char* ptr, int64_t bytes);
+        event read_async(command_queue& read_on, char* ptr, int64_t bytes, const std::vector<cl::event>& wait_on);
 
         template<typename T>
         read_info<T> read_async(command_queue& read_on, int64_t elements)
@@ -236,12 +317,21 @@ namespace cl
                 return ret;
 
             ret.data = new T[elements];
-            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T));
+            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T), {});
 
             return ret;
         }
 
         void set_to_zero(command_queue& write_on);
+        void fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size);
+
+        template<typename T>
+        void fill(command_queue& write_on, const T& value)
+        {
+            assert((alloc_size % sizeof(T)) == 0);
+
+            fill(write_on, (void*)&value, sizeof(T), alloc_size);
+        }
 
         template<typename T>
         std::vector<T> read(command_queue& read_on)
@@ -257,6 +347,9 @@ namespace cl
 
             return ret;
         }
+
+        cl::buffer as_device_read_only();
+        cl::buffer as_device_write_only();
     };
 
     struct image_base : mem_object
@@ -382,7 +475,6 @@ namespace cl
         }*/
     };
 
-
     struct image_with_mipmaps : image_base
     {
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -429,10 +521,13 @@ namespace cl
     {
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
-        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 
+        event enqueue_marker(const std::vector<event>& deps);
+
+        event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
         void block();
@@ -461,8 +556,11 @@ namespace cl
         void create_from_texture_with_mipmaps(GLuint texture_id, int mip_level);
         void create_from_framebuffer(GLuint framebuffer_id);
 
-        void acquire(command_queue& cqueue);
-        void unacquire(command_queue& cqueue);
+        event acquire(command_queue& cqueue);
+        event unacquire(command_queue& cqueue);
+
+        event acquire(command_queue& cqueue, const std::vector<cl::event>& events);
+        event unacquire(command_queue& cqueue, const std::vector<cl::event>& events);
     };
 
     template<int N, typename T>
@@ -527,57 +625,72 @@ namespace cl
 
 template<>
 inline
-void cl::args::push_back<cl::mem_object>(cl::mem_object& val)
+void cl::args::push_back<cl::command_queue>(const cl::command_queue& val)
 {
-    cl::arg_info inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::command_queue> uptr = std::make_unique<cl::command_queue>(val);
+    cl_command_queue* ptr = &uptr->native_command_queue.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::buffer>(cl::buffer& val)
+void cl::args::push_back<cl::device_command_queue>(const cl::device_command_queue& val)
 {
-    cl::arg_info inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::device_command_queue> uptr = std::make_unique<cl::device_command_queue>(val);
+    cl_command_queue* ptr = &uptr->native_command_queue.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::gl_rendertexture>(cl::gl_rendertexture& val)
+void cl::args::push_back<cl::mem_object>(const cl::mem_object& val)
 {
-    cl::arg_info inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::mem_object> uptr = std::make_unique<cl::mem_object>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::image>(cl::image& val)
+void cl::args::push_back<cl::buffer>(const cl::buffer& val)
 {
-    cl::arg_info inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::buffer> uptr = std::make_unique<cl::buffer>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 template<>
 inline
-void cl::args::push_back<cl::image_with_mipmaps>(cl::image_with_mipmaps& val)
+void cl::args::push_back<cl::gl_rendertexture>(const cl::gl_rendertexture& val)
 {
-    cl::arg_info inf;
-    inf.ptr = &val.native_mem_object.data;
-    inf.size = sizeof(cl_mem);
+    std::unique_ptr<cl::gl_rendertexture> uptr = std::make_unique<cl::gl_rendertexture>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
 
-    arg_list.push_back(inf);
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
+}
+
+template<>
+inline
+void cl::args::push_back<cl::image>(const cl::image& val)
+{
+    std::unique_ptr<cl::image> uptr = std::make_unique<cl::image>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
+
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
+}
+
+template<>
+inline
+void cl::args::push_back<cl::image_with_mipmaps>(const cl::image_with_mipmaps& val)
+{
+    std::unique_ptr<cl::image_with_mipmaps> uptr = std::make_unique<cl::image_with_mipmaps>(val);
+    cl_mem* ptr = &uptr->native_mem_object.data;
+
+    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 #endif // OPENCL_HPP_INCLUDED

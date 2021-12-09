@@ -18,7 +18,7 @@
 #include <GL/glx.h>
 #endif
 
-#define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
+#define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {printf("Got opencl error %i\n", err); throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
 
 static
 std::string read_file(const std::string& file)
@@ -80,8 +80,6 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
                     if(strstr(chBuffer, "NVIDIA") != NULL || strstr(chBuffer, "AMD") != NULL)// || strstr(chBuffer, "Intel") != NULL)
                     {
                         *clSelectedPlatformID = clPlatformIDs[i];
-
-                        //printf("Picked Platform: %s\n", chBuffer);
                     }
                 }
             }
@@ -92,6 +90,15 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
             }
         }
     }
+}
+
+static
+cl_event* get_event_pointer(const std::vector<cl::event>& events)
+{
+    if(events.size() > 0)
+        return (cl_event*)&events[0];
+
+    return nullptr;
 }
 
 void cl::event::block()
@@ -115,6 +122,20 @@ bool cl::event::is_finished()
     return status == CL_COMPLETE;
 }
 
+void cl::event::set_completion_callback(void (CL_CALLBACK* pfn_notify)(cl_event event, cl_int event_command_status, void *user_data), void* userdata)
+{
+    clSetEventCallback(native_event.data, CL_COMPLETE, pfn_notify, userdata);
+}
+
+int count_arguments(cl_kernel k)
+{
+    cl_uint argc = 0;
+
+    CHECK(clGetKernelInfo(k, CL_KERNEL_NUM_ARGS, sizeof(cl_uint), (void*)&argc, nullptr));
+
+    return argc;
+}
+
 cl::kernel::kernel()
 {
 
@@ -122,6 +143,8 @@ cl::kernel::kernel()
 
 cl::kernel::kernel(cl::program& p, const std::string& kname)
 {
+    p.ensure_built();
+
     name = kname;
 
     cl_int err;
@@ -137,6 +160,8 @@ cl::kernel::kernel(cl::program& p, const std::string& kname)
     {
         native_kernel.data = ret;
     }
+
+    argument_count = count_arguments(ret);
 }
 
 cl::kernel::kernel(cl_kernel k)
@@ -156,11 +181,49 @@ cl::kernel::kernel(cl_kernel k)
     name.resize(ret + 1);
 
     clGetKernelInfo(k, CL_KERNEL_FUNCTION_NAME, name.size(), &name[0], nullptr);
+
+    argument_count = count_arguments(k);
+}
+
+void cl::kernel::set_args(cl::args& pack)
+{
+    if((int)pack.arg_list.size() != argument_count)
+        throw std::runtime_error("Called kernel " + name + " with wrong number of arguments");
+
+    for(int i=0; i < (int)pack.arg_list.size(); i++)
+    {
+        clSetKernelArg(native_kernel.data, i, pack.arg_list[i]->fetch_size(), pack.arg_list[i]->fetch_ptr());
+    }
+}
+
+cl_program cl::kernel::fetch_program()
+{
+    cl_program ret;
+
+    clGetKernelInfo(native_kernel.data, CL_KERNEL_PROGRAM, sizeof(cl_program), &ret, nullptr);
+
+    return ret;
+}
+
+cl::kernel cl::kernel::clone()
+{
+    cl_program prog = fetch_program();
+
+    cl_int err = 0;
+
+    cl_kernel kern = clCreateKernel(prog, name.c_str(), &err);
+
+    if(err != CL_SUCCESS)
+        throw std::runtime_error("Could not clone kernel " + name + " with error " + std::to_string(err));
+
+    cl::kernel ret(kern);
+
+    return ret;
 }
 
 cl::context::context()
 {
-    kernels = std::make_shared<std::vector<std::map<std::string, kernel>>>();
+    kernels = std::make_shared<std::vector<std::map<std::string, kernel, std::less<>>>>();
 
     cl_platform_id pid = {};
     get_platform_ids(&pid);
@@ -202,6 +265,8 @@ cl::context::context()
 
 void cl::context::register_program(cl::program& p)
 {
+    p.ensure_built();
+
     programs.push_back(p);
 
     cl_uint num = 0;
@@ -220,7 +285,7 @@ void cl::context::register_program(cl::program& p)
 
     cl_kernels.resize(num);
 
-    std::map<std::string, cl::kernel>& which = kernels->emplace_back();
+    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
 
     for(cl_kernel& k : cl_kernels)
     {
@@ -245,6 +310,19 @@ void cl::context::deregister_program(int idx)
     programs.erase(programs.begin() + idx);
 }
 
+cl::kernel cl::context::fetch_kernel(std::string_view name)
+{
+    for(auto& program_map : *kernels)
+    {
+        if(auto it = program_map.find(name); it != program_map.end())
+        {
+            return it->second;
+        }
+    }
+
+    throw std::runtime_error("no such kernel in context");
+}
+
 cl::program::program(context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
 {
 
@@ -254,6 +332,8 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
 {
     if(data.size() == 0)
         throw std::runtime_error("No Program Data (0 length data vector)");
+
+    async = std::make_shared<async_context>();
 
     if(is_file)
     {
@@ -288,35 +368,53 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
+void debug_build_status(cl::program& prog)
+{
+    cl_build_status bstatus;
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+
+    std::cout << "Build Status: " << bstatus << std::endl;
+
+    assert(bstatus == CL_BUILD_ERROR);
+
+    std::string log;
+    size_t log_size;
+
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+
+    log.resize(log_size + 1);
+
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
+
+    std::cout << log << std::endl;
+
+    throw std::runtime_error("Failed to build");
+}
+
 void cl::program::build(context& ctx, const std::string& options)
 {
-    std::string build_options = "-cl-fast-relaxed-math -cl-no-signed-zeros -cl-single-precision-constant -cl-denorms-are-zero " + options;
+    async->selected_device = ctx.selected_device;
+    std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
 
-    cl_int build_status = clBuildProgram(native_program.data, 1, &ctx.selected_device, build_options.c_str(), nullptr, nullptr);
+    cl_program prog = native_program.data;
+    cl_device_id selected_device = ctx.selected_device;
 
-    if(build_status != CL_SUCCESS)
+    async->thrd = std::thread([prog, selected_device, build_options]()
     {
-        std::cout << "Build Error: " << build_status << std::endl;
+        clBuildProgram(prog, 1, &selected_device, build_options.c_str(), nullptr, nullptr);
+    });
+}
 
-        cl_build_status bstatus;
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+void cl::program::ensure_built()
+{
+    async->thrd.join();
 
-        std::cout << "Build Status: " << bstatus << std::endl;
+    cl_build_status status;
+    clGetProgramBuildInfo(native_program.data, async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
 
-        assert(bstatus == CL_BUILD_ERROR);
-
-        std::string log;
-        size_t log_size;
-
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
-
-        log.resize(log_size + 1);
-
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
-
-        std::cout << log << std::endl;
-
-        throw std::runtime_error("Failed to build");
+    if(status != CL_SUCCESS)
+    {
+        debug_build_status(*this);
     }
 }
 
@@ -363,24 +461,26 @@ void event_memory_free(cl_event event, cl_int event_command_status, void* user_d
     delete [] (char*)user_data;
 }
 
-void cl::buffer::write_async(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+cl::event cl::buffer::write_async(cl::command_queue& write_on, const char* ptr, int64_t bytes)
 {
     assert(bytes <= alloc_size);
 
-    cl_event evt;
+    cl::event evt;
 
     char* nptr = new char[bytes];
 
     memcpy(nptr, ptr, bytes);
 
-    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, nptr, 0, nullptr, &evt);
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, nptr, 0, nullptr, &evt.native_event.data);
 
-    clSetEventCallback(evt, CL_COMPLETE, &event_memory_free, nptr);
+    clSetEventCallback(evt.native_event.data, CL_COMPLETE, &event_memory_free, nptr);
 
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not write");
     }
+
+    return evt;
 }
 
 void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
@@ -395,13 +495,25 @@ void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
     }
 }
 
-cl::event cl::buffer::read_async(cl::command_queue& read_on, char* ptr, int64_t bytes)
+cl::event cl::buffer::read_async(cl::command_queue& read_on, char* ptr, int64_t bytes, const std::vector<cl::event>& wait_on)
 {
     assert(bytes <= alloc_size);
 
+    std::vector<cl_event> evts;
+
+    for(auto& i : wait_on)
+    {
+        evts.push_back(i.native_event.data);
+    }
+
+    cl_event* eptr = nullptr;
+
+    if(evts.size() > 0)
+        eptr = evts.data();
+
     cl::event evt;
 
-    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, ptr, 0, nullptr, &evt.native_event.data);
+    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, ptr, evts.size(), eptr, &evt.native_event.data);
 
     if(val != CL_SUCCESS)
     {
@@ -421,6 +533,52 @@ void cl::buffer::set_to_zero(cl::command_queue& write_on)
     {
         throw std::runtime_error("Could not set_to_zero");
     }
+}
+
+void cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size)
+{
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, 0, nullptr, nullptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not fill buffer");
+    }
+}
+
+cl::buffer cl::buffer::as_device_read_only()
+{
+    cl::buffer buf = *this;
+
+    cl_buffer_region region;
+    region.origin = 0;
+    region.size = alloc_size;
+
+    cl_int err = 0;
+    cl_mem as_readable = clCreateSubBuffer(native_mem_object.data, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+
+    assert(err == 0);
+
+    buf.native_mem_object.consume(as_readable);
+
+    return buf;
+}
+
+cl::buffer cl::buffer::as_device_write_only()
+{
+    cl::buffer buf = *this;
+
+    cl_buffer_region region;
+    region.origin = 0;
+    region.size = alloc_size;
+
+    cl_int err = 0;
+    cl_mem as_readable = clCreateSubBuffer(native_mem_object.data, CL_MEM_WRITE_ONLY | CL_MEM_HOST_NO_ACCESS, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+
+    assert(err == 0);
+
+    buf.native_mem_object.consume(as_readable);
+
+    return buf;
 }
 
 cl::image::image(cl::context& ctx)
@@ -626,10 +784,85 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
     native_context = ctx.native_context;
 }
 
-cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
 {
     cl::event ret;
 
+    CHECK(clEnqueueMarkerWithWaitList(native_command_queue.data, deps.size(), get_event_pointer(deps), &ret.native_event.data));
+
+    return ret;
+}
+
+cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+{
+    cl::event ret;
+
+    int dim = global_ws.size();
+
+    size_t g_ws[3] = {0};
+    size_t l_ws[3] = {0};
+
+    for(int i=0; i < dim; i++)
+    {
+        l_ws[i] = local_ws[i];
+        g_ws[i] = global_ws[i];
+
+        if(l_ws[i] == 0)
+            continue;
+
+        if((g_ws[i] % l_ws[i]) != 0)
+        {
+            int rem = g_ws[i] % l_ws[i];
+
+            g_ws[i] -= rem;
+            g_ws[i] += l_ws[i];
+        }
+
+        if(g_ws[i] == 0)
+        {
+            g_ws[i] += l_ws[i];
+        }
+    }
+
+    static_assert(sizeof(cl::event) == sizeof(cl_event));
+
+    cl_int err = CL_SUCCESS;
+
+    #ifndef GPU_PROFILE
+    if(deps.size() > 0)
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
+    else
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+    #else
+
+    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+
+    cl_ulong start;
+    cl_ulong finish;
+
+    block();
+
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+    clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
+
+    cl_ulong diff = finish - start;
+
+    double ddiff = diff / 1000. / 1000.;
+
+    std::cout << "kernel " << kern.name << " ms " << ddiff << std::endl;
+
+    #endif // GPU_PROFILE
+
+    if(err != CL_SUCCESS)
+    {
+        std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kern.name << std::endl;
+    }
+
+    return ret;
+}
+
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+{
     assert(global_ws.size() == local_ws.size());
 
     for(auto& kerns : *kernels)
@@ -641,76 +874,12 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
 
         cl::kernel& kern = kernel_it->second;
 
-        for(int i=0; i < (int)pack.arg_list.size(); i++)
-        {
-            clSetKernelArg(kern.native_kernel.data, i, pack.arg_list[i].size, pack.arg_list[i].ptr);
-        }
+        kern.set_args(pack);
 
-        int dim = global_ws.size();
-
-        size_t g_ws[3] = {0};
-        size_t l_ws[3] = {0};
-
-        for(int i=0; i < dim; i++)
-        {
-            l_ws[i] = local_ws[i];
-            g_ws[i] = global_ws[i];
-
-            if(l_ws[i] == 0)
-                continue;
-
-            if((g_ws[i] % l_ws[i]) != 0)
-            {
-                int rem = g_ws[i] % l_ws[i];
-
-                g_ws[i] -= rem;
-                g_ws[i] += l_ws[i];
-            }
-
-            if(g_ws[i] == 0)
-            {
-                g_ws[i] += l_ws[i];
-            }
-        }
-
-        static_assert(sizeof(cl::event) == sizeof(cl_event));
-
-        cl_int err = CL_SUCCESS;
-
-        #ifndef GPU_PROFILE
-        if(deps.size() > 0)
-            err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
-        else
-            err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
-        #else
-
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
-
-        cl_ulong start;
-        cl_ulong finish;
-
-        block();
-
-        clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
-        clGetEventProfilingInfo(ret.native_event.data, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &finish, nullptr);
-
-        cl_ulong diff = finish - start;
-
-        double ddiff = diff / 1000. / 1000.;
-
-        std::cout << "kernel " << kname << " ms " << ddiff << std::endl;
-
-        #endif // GPU_PROFILE
-
-        if(err != CL_SUCCESS)
-        {
-            std::cout << "clEnqueueNDRangeKernel Error " << err << " for kernel " << kname << std::endl;
-        }
-
-        return ret;
+        return exec(kern, global_ws, local_ws, deps);
     }
 
-    throw std::runtime_error("Kernel not found in any program");
+    throw std::runtime_error("Kernel " + kname + " not found in any program");
 }
 
 cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
@@ -863,28 +1032,48 @@ void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
     }*/
 }
 
-void cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
+cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)
 {
+    cl::event ret;
+
     if(acquired)
-        return;
+        return ret;
 
     acquired = true;
 
-    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, nullptr);
+    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), get_event_pointer(events), &ret.native_event.data);
+
+    return ret;
 }
 
-void cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
+cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
 {
+    return acquire(cqueue, {});
+}
+
+cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)
+{
+    cl::event ret;
+
     if(!acquired)
-        return;
+        return ret;
 
     acquired = false;
 
-    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, 0, nullptr, nullptr);
+    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), get_event_pointer(events), &ret.native_event.data);
+
+    return ret;
+}
+
+cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
+{
+    return unacquire(cqueue, {});
 }
 
 void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
 {
+    assert(b1.alloc_size == b2.alloc_size);
+
     size_t amount = std::min(b1.alloc_size, b2.alloc_size);
 
     cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, b1.native_mem_object.data, b2.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);

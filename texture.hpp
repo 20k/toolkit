@@ -8,6 +8,7 @@ struct texture_settings
     int width = 0;
     int height = 0;
     bool is_srgb = true;
+    bool generate_mipmaps = true;
 
     bool magnify_linear = true;
     bool shrink_linear = true;
@@ -21,6 +22,9 @@ struct texture
     void load_from_memory(const uint8_t* pixels_rgba, vec2i dim);
 
     void load_from_memory(const texture_settings& settings, const uint8_t* pixels_rgba);
+
+    std::vector<vec4f> read(int mip_level = 0);
+
     vec2i get_size();
     ~texture();
 

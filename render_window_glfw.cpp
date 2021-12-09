@@ -5,8 +5,8 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <imgui/misc/freetype/imgui_freetype.h>
-#include <imgui/examples/imgui_impl_glfw.h>
-#include <imgui/examples/imgui_impl_opengl3.h>
+#include <imgui/backends/imgui_impl_glfw.h>
+#include <imgui/backends/imgui_impl_opengl3.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <map>
@@ -84,7 +84,7 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 
     #ifndef __EMSCRIPTEN__
     if(!is_srgb)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, wx, wy, 0, GL_RGBA, GL_FLOAT, NULL);
     else
         glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, wx, wy, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     #else
@@ -100,6 +100,8 @@ void make_fbo(unsigned int* fboptr, unsigned int* tex, vec2i dim, bool is_srgb)
 glfw_render_context::glfw_render_context(const render_settings& lsett, const std::string& window_title)
 {
     render_settings sett = lsett;
+
+    atlas.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LCD | ImGuiFreeTypeBuilderFlags_FILTER_DEFAULT | ImGuiFreeTypeBuilderFlags_LoadColor;
 
     #ifdef __EMSCRIPTEN__
     double width, height;
@@ -187,7 +189,7 @@ glfw_render_context::glfw_render_context(const render_settings& lsett, const std
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
 
-    ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1);
+    //ImGuiFreeType::BuildFontAtlas(&atlas, ImGuiFreeTypeBuilderFlags_LCD | ImGuiFreeTypeBuilderFlags_FILTER_DEFAULT | ImGuiFreeTypeBuilderFlags_LoadColor);
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -242,6 +244,14 @@ void glfw_backend::init_screen(vec2i dim)
         clctx->cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
     }
     #endif // NO_OPENCL
+}
+
+void glfw_backend::set_is_hidden(bool is_hidden)
+{
+    if(is_hidden)
+        glfwHideWindow(ctx.window);
+    else
+        glfwShowWindow(ctx.window);
 }
 
 glfw_backend::~glfw_backend()
@@ -382,7 +392,7 @@ void glfw_backend::poll(double maximum_sleep_s)
     poll_issue_new_frame_only();
 }
 
-void glfw_backend::display()
+void glfw_backend::display_bind_and_clear()
 {
     assert(ctx.window);
 
@@ -399,8 +409,6 @@ void glfw_backend::display()
         user_data->max_frames--;
     }
 
-    ImGui::Render();
-
     vec2i dim = get_window_size();
 
     glfwMakeContextCurrent(ctx.window);
@@ -410,7 +418,13 @@ void glfw_backend::display()
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ctx.fbo);
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
+}
 
+void glfw_backend::display_render()
+{
+    vec2i dim = get_window_size();
+
+    ImGui::Render();
     //glDrawBuffer(GL_BACK);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -447,6 +461,12 @@ void glfw_backend::display()
     }
 
     glfwSwapBuffers(ctx.window);
+}
+
+void glfw_backend::display()
+{
+    display_bind_and_clear();
+    display_render();
 }
 
 void glfw_backend::display_last_frame()
