@@ -5,8 +5,8 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <imgui/misc/freetype/imgui_freetype.h>
-#include <imgui/examples/imgui_impl_sdl.h>
-#include <imgui/examples/imgui_impl_opengl3.h>
+#include <imgui/backends/imgui_impl_sdl.h>
+#include <imgui/backends/imgui_impl_opengl3.h>
 #include <GL/glew.h>
 #include <map>
 #include <iostream>
@@ -155,10 +155,15 @@ sdl2_render_context::sdl2_render_context(const render_settings& lsett, const std
     if(sett.is_srgb)
         ImGui::SetStyleLinearColor(true);
 
+    ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+    atlas->FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LCD | ImGuiFreeTypeBuilderFlags_FILTER_DEFAULT | ImGuiFreeTypeBuilderFlags_LoadColor;
+
+    ImFontConfig font_cfg;
+    font_cfg.GlyphExtraSpacing = ImVec2(0, 0);
+    font_cfg.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_LCD | ImGuiFreeTypeBuilderFlags_FILTER_DEFAULT | ImGuiFreeTypeBuilderFlags_LoadColor;
+
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
-
-    ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1);
 
     ImGui_ImplSDL2_InitForOpenGL(window, glcontext);
     ImGui_ImplOpenGL3_Init(glsl_version);
