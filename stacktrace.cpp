@@ -3,7 +3,7 @@
 
 #ifndef NO_STACKTRACE
 
-#define BOOST_STACKTRACE_USE_BACKTRACE
+#define BOOST_STACKTRACE_USE_WINDBG
 
 #include <signal.h>     // ::signal, ::raise
 #include <boost/stacktrace.hpp>
