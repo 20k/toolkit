@@ -3,7 +3,14 @@
 
 #include <string>
 
+struct stack_frame
+{
+    std::string name;
+    std::string file;
+    size_t line = 0;
+};
+
 std::string get_stacktrace();
-std::string name_from_ptr(void* ptr);
+stack_frame frame_from_ptr(void* ptr);
 
 #endif // STACKTRACE_HPP_INCLUDED
