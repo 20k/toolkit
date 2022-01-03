@@ -597,7 +597,7 @@ void sdl2_backend::set_is_maximised(bool set_max)
     {
         SDL_MaximizeWindow(ctx.window);
         next_position = {0,0};
-        set_frames = 5;
+        set_frames = 8;
     }
     else
         SDL_RestoreWindow(ctx.window);
