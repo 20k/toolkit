@@ -344,6 +344,7 @@ render_window::render_window(render_settings sett, generic_backend* _backend)
 
 render_window::render_window(render_settings sett, const std::string& window_title, backend_type::type type)
 {
+    #ifndef NO_DEFAULT_BACKEND
     #ifdef __EMSCRIPTEN__
     double width, height;
     emscripten_get_element_css_size("canvas", &width, &height);
@@ -377,6 +378,9 @@ render_window::render_window(render_settings sett, const std::string& window_tit
 
     //drag_drop_init();
     #endif // __EMSCRIPTEN__
+    #else
+    assert(false);
+    #endif
 }
 
 render_window::~render_window()

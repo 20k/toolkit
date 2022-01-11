@@ -3,7 +3,8 @@
 
 #ifndef NO_STACKTRACE
 
-#define BOOST_STACKTRACE_USE_BACKTRACE
+//#define BOOST_STACKTRACE_USE_BACKTRACE
+#define BOOST_STACKTRACE_USE_WINDBG_CACHED
 
 #include <signal.h>     // ::signal, ::raise
 #include <boost/stacktrace.hpp>
@@ -69,9 +70,16 @@ std::string get_stacktrace()
     return stream.str();
 }
 
-std::string name_from_ptr(void* ptr)
+stack_frame frame_from_ptr(void* ptr)
 {
-    return boost::stacktrace::frame((boost::stacktrace::detail::native_frame_ptr_t)ptr).name();
+    stack_frame frame;
+    boost::stacktrace::frame boost_frame((boost::stacktrace::detail::native_frame_ptr_t)ptr);
+
+    frame.name = boost_frame.name();
+    frame.file = boost_frame.source_file();
+    frame.line = boost_frame.source_line();
+
+    return frame;
 }
 
 struct static_helper

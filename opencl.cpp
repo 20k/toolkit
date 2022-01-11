@@ -92,6 +92,15 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
     }
 }
 
+static
+cl_event* get_event_pointer(const std::vector<cl::event>& events)
+{
+    if(events.size() > 0)
+        return (cl_event*)&events[0];
+
+    return nullptr;
+}
+
 void cl::event::block()
 {
     if(native_event.data == nullptr)
@@ -134,6 +143,8 @@ cl::kernel::kernel()
 
 cl::kernel::kernel(cl::program& p, const std::string& kname)
 {
+    p.ensure_built();
+
     name = kname;
 
     cl_int err;
@@ -212,7 +223,7 @@ cl::kernel cl::kernel::clone()
 
 cl::context::context()
 {
-    kernels = std::make_shared<std::vector<std::map<std::string, kernel>>>();
+    kernels = std::make_shared<std::vector<std::map<std::string, kernel, std::less<>>>>();
 
     cl_platform_id pid = {};
     get_platform_ids(&pid);
@@ -254,6 +265,8 @@ cl::context::context()
 
 void cl::context::register_program(cl::program& p)
 {
+    p.ensure_built();
+
     programs.push_back(p);
 
     cl_uint num = 0;
@@ -272,7 +285,7 @@ void cl::context::register_program(cl::program& p)
 
     cl_kernels.resize(num);
 
-    std::map<std::string, cl::kernel>& which = kernels->emplace_back();
+    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
 
     for(cl_kernel& k : cl_kernels)
     {
@@ -297,6 +310,19 @@ void cl::context::deregister_program(int idx)
     programs.erase(programs.begin() + idx);
 }
 
+cl::kernel cl::context::fetch_kernel(std::string_view name)
+{
+    for(auto& program_map : *kernels)
+    {
+        if(auto it = program_map.find(name); it != program_map.end())
+        {
+            return it->second;
+        }
+    }
+
+    throw std::runtime_error("no such kernel in context");
+}
+
 cl::program::program(context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
 {
 
@@ -306,6 +332,8 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
 {
     if(data.size() == 0)
         throw std::runtime_error("No Program Data (0 length data vector)");
+
+    async = std::make_shared<async_context>();
 
     if(is_file)
     {
@@ -340,35 +368,53 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
+void debug_build_status(cl::program& prog)
+{
+    cl_build_status bstatus;
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+
+    std::cout << "Build Status: " << bstatus << std::endl;
+
+    assert(bstatus == CL_BUILD_ERROR);
+
+    std::string log;
+    size_t log_size;
+
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+
+    log.resize(log_size + 1);
+
+    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
+
+    std::cout << log << std::endl;
+
+    throw std::runtime_error("Failed to build");
+}
+
 void cl::program::build(context& ctx, const std::string& options)
 {
+    async->selected_device = ctx.selected_device;
     std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
 
-    cl_int build_status = clBuildProgram(native_program.data, 1, &ctx.selected_device, build_options.c_str(), nullptr, nullptr);
+    cl_program prog = native_program.data;
+    cl_device_id selected_device = ctx.selected_device;
 
-    if(build_status != CL_SUCCESS)
+    async->thrd = std::thread([prog, selected_device, build_options]()
     {
-        std::cout << "Build Error: " << build_status << std::endl;
+        clBuildProgram(prog, 1, &selected_device, build_options.c_str(), nullptr, nullptr);
+    });
+}
 
-        cl_build_status bstatus;
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+void cl::program::ensure_built()
+{
+    async->thrd.join();
 
-        std::cout << "Build Status: " << bstatus << std::endl;
+    cl_build_status status;
+    clGetProgramBuildInfo(native_program.data, async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
 
-        assert(bstatus == CL_BUILD_ERROR);
-
-        std::string log;
-        size_t log_size;
-
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
-
-        log.resize(log_size + 1);
-
-        clGetProgramBuildInfo(native_program.data, ctx.selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
-
-        std::cout << log << std::endl;
-
-        throw std::runtime_error("Failed to build");
+    if(status != CL_SUCCESS)
+    {
+        debug_build_status(*this);
     }
 }
 
@@ -486,6 +532,16 @@ void cl::buffer::set_to_zero(cl::command_queue& write_on)
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not set_to_zero");
+    }
+}
+
+void cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size)
+{
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, 0, nullptr, nullptr);
+
+    if(val != CL_SUCCESS)
+    {
+        throw std::runtime_error("Could not fill buffer");
     }
 }
 
@@ -728,6 +784,15 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
     native_context = ctx.native_context;
 }
 
+cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
+{
+    cl::event ret;
+
+    CHECK(clEnqueueMarkerWithWaitList(native_command_queue.data, deps.size(), get_event_pointer(deps), &ret.native_event.data));
+
+    return ret;
+}
+
 cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
 {
     cl::event ret;
@@ -814,7 +879,7 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
         return exec(kern, global_ws, local_ws, deps);
     }
 
-    throw std::runtime_error("Kernel not found in any program");
+    throw std::runtime_error("Kernel " + kname + " not found in any program");
 }
 
 cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
@@ -967,14 +1032,6 @@ void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
     }*/
 }
 
-cl_event* get_event_pointer(const std::vector<cl::event>& events)
-{
-    if(events.size() > 0)
-        return (cl_event*)&events[0];
-
-    return nullptr;
-}
-
 cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)
 {
     cl::event ret;
@@ -1015,6 +1072,8 @@ cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
 
 void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
 {
+    assert(b1.alloc_size == b2.alloc_size);
+
     size_t amount = std::min(b1.alloc_size, b2.alloc_size);
 
     cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, b1.native_mem_object.data, b2.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);

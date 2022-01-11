@@ -12,6 +12,9 @@
 #include <vec/vec.hpp>
 #include <assert.h>
 #include <variant>
+#include <string_view>
+#include <atomic>
+#include <thread>
 
 namespace cl
 {
@@ -201,11 +204,20 @@ namespace cl
 
     struct program
     {
+        struct async_context
+        {
+            std::thread thrd;
+            std::atomic<cl_device_id> selected_device{0};
+        };
+
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
+        std::shared_ptr<async_context> async;
 
         program(context& ctx, const std::string& data, bool is_file = true);
         program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
+
         void build(context& ctx, const std::string& options);
+        void ensure_built();
     };
 
     struct kernel
@@ -228,7 +240,7 @@ namespace cl
     struct context
     {
         std::vector<program> programs;
-        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
         cl_device_id selected_device;
 
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -238,6 +250,8 @@ namespace cl
 
         void register_program(program& p);
         void deregister_program(int idx);
+
+        kernel fetch_kernel(std::string_view name);
     };
 
     struct command_queue;
@@ -309,6 +323,15 @@ namespace cl
         }
 
         void set_to_zero(command_queue& write_on);
+        void fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size);
+
+        template<typename T>
+        void fill(command_queue& write_on, const T& value)
+        {
+            assert((alloc_size % sizeof(T)) == 0);
+
+            fill(write_on, (void*)&value, sizeof(T), alloc_size);
+        }
 
         template<typename T>
         std::vector<T> read(command_queue& read_on)
@@ -498,9 +521,11 @@ namespace cl
     {
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
-        std::shared_ptr<std::vector<std::map<std::string, kernel>>> kernels;
+        std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
+
+        event enqueue_marker(const std::vector<event>& deps);
 
         event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);

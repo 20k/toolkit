@@ -282,7 +282,7 @@ void file::mkdir(const std::string& name)
     ::mkdir(name.c_str(), 0777);
     #endif // __WIN32__
     #else
-    ::mkdir(("web/" + name).c_str());
+    ::mkdir(("web/" + name).c_str(), 0777);
     #endif
 }
 
