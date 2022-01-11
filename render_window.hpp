@@ -99,6 +99,7 @@ struct generic_backend
     virtual std::string get_key_name(int key_id){return "";}
     virtual bool is_maximised(){return false;}
     virtual void set_is_maximised(bool set_max){}
+    virtual bool is_focused(){return true;}
 
     virtual bool has_dropped_file(){return false;}
     virtual dropped_file get_next_dropped_file(){return dropped_file();}

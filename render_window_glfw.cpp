@@ -654,6 +654,11 @@ void glfw_backend::set_is_maximised(bool set_max)
         glfwRestoreWindow(ctx.window);
 }
 
+bool glfw_backend::is_focused()
+{
+    return glfwGetWindowAttrib(ctx.window, GLFW_FOCUSED);
+}
+
 bool glfw_backend::has_dropped_file()
 {
     return dropped.size() > 0;
