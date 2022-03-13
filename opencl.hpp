@@ -204,10 +204,11 @@ namespace cl
 
     struct program
     {
+        cl_device_id selected_device;
+
         struct async_context
         {
             std::thread thrd;
-            std::atomic<cl_device_id> selected_device{0};
         };
 
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;

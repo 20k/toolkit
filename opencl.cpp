@@ -330,6 +330,8 @@ cl::program::program(context& ctx, const std::string& data, bool is_file) : prog
 
 cl::program::program(context& ctx, const std::vector<std::string>& data, bool is_file)
 {
+    selected_device = ctx.selected_device;
+
     if(data.size() == 0)
         throw std::runtime_error("No Program Data (0 length data vector)");
 
@@ -371,7 +373,7 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
 void debug_build_status(cl::program& prog)
 {
     cl_build_status bstatus;
-    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
 
     std::cout << "Build Status: " << bstatus << std::endl;
 
@@ -380,11 +382,11 @@ void debug_build_status(cl::program& prog)
     std::string log;
     size_t log_size;
 
-    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
 
     log.resize(log_size + 1);
 
-    clGetProgramBuildInfo(prog.native_program.data, prog.async->selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
+    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
 
     std::cout << log << std::endl;
 
@@ -393,15 +395,14 @@ void debug_build_status(cl::program& prog)
 
 void cl::program::build(context& ctx, const std::string& options)
 {
-    async->selected_device = ctx.selected_device;
     std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
 
     cl_program prog = native_program.data;
-    cl_device_id selected_device = ctx.selected_device;
+    cl_device_id selected = selected_device;
 
-    async->thrd = std::thread([prog, selected_device, build_options]()
+    async->thrd = std::thread([prog, selected, build_options]()
     {
-        clBuildProgram(prog, 1, &selected_device, build_options.c_str(), nullptr, nullptr);
+        clBuildProgram(prog, 1, &selected, build_options.c_str(), nullptr, nullptr);
     });
 }
 
@@ -410,7 +411,7 @@ void cl::program::ensure_built()
     async->thrd.join();
 
     cl_build_status status;
-    clGetProgramBuildInfo(native_program.data, async->selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
+    clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
 
     if(status != CL_SUCCESS)
     {
