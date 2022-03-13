@@ -265,39 +265,15 @@ cl::context::context()
 
 void cl::context::register_program(cl::program& p)
 {
-    printf("PREREG\n");
-
     p.ensure_built();
 
     programs.push_back(p);
 
-    cl_uint num = 0;
-    cl_int err = clCreateKernelsInProgram(p.native_program.data, 0, nullptr, &num);
-
-    if(err != CL_SUCCESS)
-    {
-        std::cout << "Error creating program " << err << std::endl;
-        throw std::runtime_error("Bad Program");
-    }
-
-    std::vector<cl_kernel> cl_kernels;
-    cl_kernels.resize(num + 1);
-
-    clCreateKernelsInProgram(p.native_program.data, num, &cl_kernels[0], nullptr);
-
-    cl_kernels.resize(num);
-
     std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
 
-    for(cl_kernel& k : cl_kernels)
+    for(auto& [name, kern] : p.async->built_kernels)
     {
-        cl::kernel k1(k);
-
-        k1.name.resize(strlen(k1.name.c_str()));
-
-        std::cout << "Registered " << k1.name << std::endl;
-
-        which[k1.name] = k1;
+        which[name] = kern;
     }
 }
 
@@ -308,6 +284,7 @@ void cl::context::deregister_program(int idx)
 
     assert(programs.size() == kernels->size());
 
+    ///??????? This seems incredibly wrong
     kernels->erase(kernels->begin() + idx);
     programs.erase(programs.begin() + idx);
 }
@@ -406,6 +383,36 @@ void cl::program::build(context& ctx, const std::string& options)
     std::thread([prog, selected, build_options, async_ctx]()
     {
         clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
+
+        cl_uint num = 0;
+        cl_int err = clCreateKernelsInProgram(prog.data, 0, nullptr, &num);
+
+        if(err != CL_SUCCESS)
+        {
+            std::cout << "Error creating program " << err << std::endl;
+            throw std::runtime_error("Bad Program");
+        }
+
+        std::vector<cl_kernel> cl_kernels;
+        cl_kernels.resize(num + 1);
+
+        clCreateKernelsInProgram(prog.data, num, cl_kernels.data(), nullptr);
+
+        cl_kernels.resize(num);
+
+        std::map<std::string, cl::kernel>& which = async_ctx->built_kernels;
+
+        for(cl_kernel k : cl_kernels)
+        {
+            cl::kernel k1(k);
+
+            k1.name.resize(strlen(k1.name.c_str()));
+
+            std::cout << "Registered " << k1.name << std::endl;
+
+            which[k1.name] = k1;
+        }
+
         async_ctx->finished_waiter.test_and_set();
         async_ctx->finished_waiter.notify_all();
     }).detach();

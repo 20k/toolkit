@@ -201,6 +201,7 @@ namespace cl
     };
 
     struct context;
+    struct kernel;
 
     struct program
     {
@@ -208,9 +209,9 @@ namespace cl
 
         struct async_context
         {
-            std::thread thrd;
             std::atomic_flag finished_waiter;
             std::atomic_bool built{false};
+            std::map<std::string, cl::kernel> built_kernels;
         };
 
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
