@@ -209,6 +209,7 @@ namespace cl
         struct async_context
         {
             std::thread thrd;
+            std::atomic_bool built{false};
         };
 
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
@@ -219,6 +220,7 @@ namespace cl
 
         void build(context& ctx, const std::string& options);
         void ensure_built();
+        bool is_built();
     };
 
     struct kernel

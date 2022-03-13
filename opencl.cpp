@@ -399,10 +399,12 @@ void cl::program::build(context& ctx, const std::string& options)
 
     cl_program prog = native_program.data;
     cl_device_id selected = selected_device;
+    std::atomic_bool& build_status = async->built;
 
-    async->thrd = std::thread([prog, selected, build_options]()
+    async->thrd = std::thread([prog, selected, build_options, &build_status]()
     {
         clBuildProgram(prog, 1, &selected, build_options.c_str(), nullptr, nullptr);
+        build_status = true;
     });
 }
 
@@ -417,6 +419,11 @@ void cl::program::ensure_built()
     {
         debug_build_status(*this);
     }
+}
+
+bool cl::program::is_built()
+{
+    return async->built;
 }
 
 cl::buffer::buffer(cl::context& ctx)
