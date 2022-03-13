@@ -209,6 +209,7 @@ namespace cl
         struct async_context
         {
             std::thread thrd;
+            std::atomic_flag finished_waiter;
             std::atomic_bool built{false};
         };
 

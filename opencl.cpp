@@ -265,6 +265,8 @@ cl::context::context()
 
 void cl::context::register_program(cl::program& p)
 {
+    printf("PREREG\n");
+
     p.ensure_built();
 
     programs.push_back(p);
@@ -397,20 +399,24 @@ void cl::program::build(context& ctx, const std::string& options)
 {
     std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
 
-    cl_program prog = native_program.data;
+    auto prog = native_program;
     cl_device_id selected = selected_device;
-    std::atomic_bool& build_status = async->built;
+    std::shared_ptr<async_context> async_ctx = async;
 
-    async->thrd = std::thread([prog, selected, build_options, &build_status]()
+    std::thread([prog, selected, build_options, async_ctx]()
     {
-        clBuildProgram(prog, 1, &selected, build_options.c_str(), nullptr, nullptr);
-        build_status = true;
-    });
+        clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
+        async_ctx->finished_waiter.test_and_set();
+        async_ctx->finished_waiter.notify_all();
+    }).detach();
 }
 
 void cl::program::ensure_built()
 {
-    async->thrd.join();
+    if(is_built())
+        return;
+
+    async->finished_waiter.wait(false);
 
     cl_build_status status;
     clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
@@ -423,7 +429,7 @@ void cl::program::ensure_built()
 
 bool cl::program::is_built()
 {
-    return async->built;
+    return async->finished_waiter.test();
 }
 
 cl::buffer::buffer(cl::context& ctx)
