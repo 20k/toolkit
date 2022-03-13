@@ -372,6 +372,19 @@ void debug_build_status(cl::program& prog)
     throw std::runtime_error("Failed to build");
 }
 
+struct async_setter
+{
+    std::shared_ptr<cl::program::async_context> async_ctx;
+
+    async_setter(std::shared_ptr<cl::program::async_context> sett) : async_ctx(sett){}
+
+    ~async_setter()
+    {
+        async_ctx->finished_waiter.test_and_set();
+        async_ctx->finished_waiter.notify_all();
+    }
+};
+
 void cl::program::build(context& ctx, const std::string& options)
 {
     std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
@@ -382,7 +395,15 @@ void cl::program::build(context& ctx, const std::string& options)
 
     std::thread([prog, selected, build_options, async_ctx]()
     {
+        async_setter sett(async_ctx);
+
+        if(async_ctx->cancelled)
+            return;
+
         clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
+
+        if(async_ctx->cancelled)
+            return;
 
         cl_uint num = 0;
         cl_int err = clCreateKernelsInProgram(prog.data, 0, nullptr, &num);
@@ -392,6 +413,9 @@ void cl::program::build(context& ctx, const std::string& options)
             std::cout << "Error creating program " << err << std::endl;
             throw std::runtime_error("Bad Program");
         }
+
+        if(async_ctx->cancelled)
+            return;
 
         std::vector<cl_kernel> cl_kernels;
         cl_kernels.resize(num + 1);
@@ -412,9 +436,6 @@ void cl::program::build(context& ctx, const std::string& options)
 
             which[k1.name] = k1;
         }
-
-        async_ctx->finished_waiter.test_and_set();
-        async_ctx->finished_waiter.notify_all();
     }).detach();
 }
 
@@ -424,6 +445,12 @@ void cl::program::ensure_built()
         return;
 
     async->finished_waiter.wait(false);
+
+    if(!is_built())
+    {
+        printf("Program not built\n");
+        return;
+    }
 
     cl_build_status status;
     clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
@@ -437,6 +464,11 @@ void cl::program::ensure_built()
 bool cl::program::is_built()
 {
     return async->finished_waiter.test();
+}
+
+void cl::program::cancel()
+{
+    async->cancelled = true;
 }
 
 cl::buffer::buffer(cl::context& ctx)

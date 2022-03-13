@@ -211,6 +211,7 @@ namespace cl
         {
             std::atomic_flag finished_waiter;
             std::atomic_bool built{false};
+            std::atomic_bool cancelled{false};
             std::map<std::string, cl::kernel> built_kernels;
         };
 
@@ -223,6 +224,7 @@ namespace cl
         void build(context& ctx, const std::string& options);
         void ensure_built();
         bool is_built();
+        void cancel(); ///purely optional
     };
 
     struct kernel
