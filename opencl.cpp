@@ -1123,13 +1123,13 @@ cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
     return unacquire(cqueue, {});
 }
 
-void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
+void cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
 {
-    assert(b1.alloc_size == b2.alloc_size);
+    assert(source.alloc_size == dest.alloc_size);
 
-    size_t amount = std::min(b1.alloc_size, b2.alloc_size);
+    size_t amount = std::min(source.alloc_size, dest.alloc_size);
 
-    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, b1.native_mem_object.data, b2.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);
+    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);
 
     if(err != CL_SUCCESS)
     {
