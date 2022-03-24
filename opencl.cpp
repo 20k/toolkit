@@ -349,10 +349,13 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
-void debug_build_status(cl::program& prog)
+void debug_build_status(cl_program prog, cl_device_id selected_device)
 {
     cl_build_status bstatus;
-    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+    clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+
+    if(bstatus == CL_SUCCESS)
+        return;
 
     std::cout << "Build Status: " << bstatus << std::endl;
 
@@ -361,15 +364,20 @@ void debug_build_status(cl::program& prog)
     std::string log;
     size_t log_size;
 
-    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+    clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
 
     log.resize(log_size + 1);
 
-    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
+    clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
 
     std::cout << log << std::endl;
 
     throw std::runtime_error("Failed to build");
+}
+
+void debug_build_status(cl::program& prog)
+{
+    debug_build_status(prog.native_program.data, prog.selected_device);
 }
 
 struct async_setter
@@ -404,6 +412,8 @@ void cl::program::build(context& ctx, const std::string& options)
 
         if(async_ctx->cancelled)
             return;
+
+        debug_build_status(prog.data, selected);
 
         cl_uint num = 0;
         cl_int err = clCreateKernelsInProgram(prog.data, 0, nullptr, &num);
