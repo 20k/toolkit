@@ -35,6 +35,10 @@ struct glfw_render_context
 
 struct glfw_backend : generic_backend
 {
+    vec2i pre_max_pos;
+    vec2i pre_max_dim;
+    bool was_windowed_ever = false;
+
     glfw_render_context ctx;
     opencl_context* clctx = nullptr;
 

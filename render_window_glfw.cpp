@@ -636,6 +636,21 @@ std::string glfw_backend::get_key_name(int key_id)
         return it->second;
 }
 
+struct monitor_info
+{
+    vec2i pos = {0,0};
+    vec2i dim = {0,0};
+
+    monitor_info(GLFWmonitor* win)
+    {
+        glfwGetMonitorPos(win, &pos.x(), &pos.y());
+
+        const GLFWvidmode* mode = glfwGetVideoMode(win);
+
+        dim = {mode->width, mode->height};
+    }
+};
+
 bool glfw_backend::is_maximised()
 {
     int count = 0;
@@ -647,16 +662,10 @@ bool glfw_backend::is_maximised()
 
     for(int i=0; i < count; i++)
     {
-        int mon_x_pos = 0;
-        int mon_y_pos = 0;
+        monitor_info inf(mons[i]);
 
-        int mon_width = 0;
-        int mon_height = 0;
-
-        glfwGetMonitorWorkarea(mons[i], &mon_x_pos, &mon_y_pos, &mon_width, &mon_height);
-
-        if(mon_x_pos == pos.x() && mon_y_pos == pos.y() &&
-           mon_width == dim.x() && mon_height == dim.y())
+        if(pos.x() == inf.pos.x() && pos.y() == inf.pos.y() &&
+           dim.x() == inf.dim.x() && dim.y() == inf.dim.y())
             return true;
     }
 
@@ -671,16 +680,10 @@ GLFWmonitor* get_monitor_of(vec2i pos)
 
     for(int i=0; i < count; i++)
     {
-        int mon_x_pos = 0;
-        int mon_y_pos = 0;
+        monitor_info inf(mons[i]);
 
-        int mon_width = 0;
-        int mon_height = 0;
-
-        glfwGetMonitorWorkarea(mons[i], &mon_x_pos, &mon_y_pos, &mon_width, &mon_height);
-
-        if(pos.x() >= mon_x_pos && pos.x() <= mon_x_pos + mon_width &&
-           pos.y() >= mon_y_pos && pos.y() <= mon_y_pos + mon_height)
+        if(pos.x() >= inf.pos.x() && pos.x() <= inf.pos.x() + inf.dim.x() &&
+           pos.y() >= inf.pos.y() && pos.y() <= inf.pos.y() + inf.dim.y())
             return mons[i];
     }
 
@@ -694,21 +697,49 @@ void glfw_backend::set_is_maximised(bool set_max)
     if(is_max == set_max)
         return;
 
-    GLFWmonitor* found = get_monitor_of(get_window_position());
+    ///was windowed
+    if(set_max)
+    {
+        pre_max_pos = get_window_position();
+        pre_max_dim = get_window_size();
 
-    if(found == nullptr)
-        found = glfwGetPrimaryMonitor();
+        was_windowed_ever = true;
 
-    int mon_x_pos = 0;
-    int mon_y_pos = 0;
+        GLFWmonitor* found = get_monitor_of(get_window_position());
 
-    int mon_width = 0;
-    int mon_height = 0;
+        if(found == nullptr)
+            found = glfwGetPrimaryMonitor();
 
-    glfwGetMonitorWorkarea(found, &mon_x_pos, &mon_y_pos, &mon_width, &mon_height);
+        monitor_info inf(found);
 
-    glfwSetWindowPos(ctx.window, mon_x_pos, mon_y_pos);
-    glfwSetWindowSize(ctx.window, mon_width, mon_height);
+        glfwSetWindowPos(ctx.window, inf.pos.x(), inf.pos.y());
+        glfwSetWindowSize(ctx.window, inf.dim.x(), inf.dim.y());
+    }
+    else
+    {
+        if(was_windowed_ever)
+        {
+            glfwSetWindowPos(ctx.window, pre_max_pos.x(), pre_max_pos.y());
+            glfwSetWindowSize(ctx.window, pre_max_dim.x(), pre_max_dim.y());
+        }
+        else
+        {
+            GLFWmonitor* found = get_monitor_of(get_window_position());
+
+            if(found == nullptr)
+                found = glfwGetPrimaryMonitor();
+
+            monitor_info inf(found);
+
+            vec2i new_start = inf.pos + inf.dim / 4;
+            vec2i new_end = inf.pos + inf.dim - inf.dim / 4;
+
+            vec2i new_dim = new_end - new_start;
+
+            glfwSetWindowPos(ctx.window, new_start.x(), new_start.y());
+            glfwSetWindowSize(ctx.window, new_dim.x(), new_dim.y());
+        }
+    }
 }
 
 bool glfw_backend::is_focused()
