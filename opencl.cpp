@@ -349,10 +349,13 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
-void debug_build_status(cl::program& prog)
+void debug_build_status(cl_program prog, cl_device_id selected_device)
 {
     cl_build_status bstatus;
-    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+    clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+
+    if(bstatus == CL_SUCCESS)
+        return;
 
     std::cout << "Build Status: " << bstatus << std::endl;
 
@@ -361,15 +364,20 @@ void debug_build_status(cl::program& prog)
     std::string log;
     size_t log_size;
 
-    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+    clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
 
     log.resize(log_size + 1);
 
-    clGetProgramBuildInfo(prog.native_program.data, prog.selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
+    clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_LOG, log.size(), &log[0], nullptr);
 
     std::cout << log << std::endl;
 
     throw std::runtime_error("Failed to build");
+}
+
+void debug_build_status(cl::program& prog)
+{
+    debug_build_status(prog.native_program.data, prog.selected_device);
 }
 
 struct async_setter
@@ -404,6 +412,8 @@ void cl::program::build(context& ctx, const std::string& options)
 
         if(async_ctx->cancelled)
             return;
+
+        debug_build_status(prog.data, selected);
 
         cl_uint num = 0;
         cl_int err = clCreateKernelsInProgram(prog.data, 0, nullptr, &num);
@@ -1123,18 +1133,39 @@ cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
     return unacquire(cqueue, {});
 }
 
-void cl::copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2)
+void cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
 {
-    assert(b1.alloc_size == b2.alloc_size);
+    assert(source.alloc_size == dest.alloc_size);
 
-    size_t amount = std::min(b1.alloc_size, b2.alloc_size);
+    size_t amount = std::min(source.alloc_size, dest.alloc_size);
 
-    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, b1.native_mem_object.data, b2.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);
+    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);
 
     if(err != CL_SUCCESS)
     {
         throw std::runtime_error("Could not copy buffers");
     }
+}
+
+std::string cl::get_extensions(context& ctx)
+{
+    size_t arr_size = 0;
+    cl_int err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, 0, nullptr, &arr_size);
+
+    if(err != CL_SUCCESS)
+    {
+        throw std::runtime_error("Error in clGetDeviceInfo");
+    }
+
+    if(arr_size == 0)
+        return "";
+
+    std::string extensions;
+    extensions.resize(arr_size + 1);
+
+    err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, arr_size, extensions.data(), nullptr);
+
+    return extensions;
 }
 
 bool cl::supports_extension(cl::context& ctx, const std::string& name)
@@ -1162,5 +1193,6 @@ bool cl::supports_extension(cl::context& ctx, const std::string& name)
 
     return extensions.find(name) != std::string::npos;
 }
+
 
 #endif // NO_OPENCL

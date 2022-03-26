@@ -605,7 +605,7 @@ namespace cl
         }
     };
 
-    void copy(cl::command_queue& cqueue, cl::buffer& b1, cl::buffer& b2);
+    void copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest);
 
     template<typename T, typename U>
     void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec3i origin, vec3i region)
@@ -625,6 +625,7 @@ namespace cl
         clEnqueueCopyImage(cqueue.native_command_queue.data, i1.native_mem_object.data, i2.native_mem_object.data, src, src, iregion, 0, nullptr, nullptr);
     }
 
+    std::string get_extensions(context& ctx);
     bool supports_extension(context& ctx, const std::string& name);
 
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
