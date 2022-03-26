@@ -638,7 +638,53 @@ std::string glfw_backend::get_key_name(int key_id)
 
 bool glfw_backend::is_maximised()
 {
-    return glfwGetWindowAttrib(ctx.window, GLFW_MAXIMIZED);
+    int count = 0;
+
+    vec2i pos = get_window_position();
+    vec2i dim = get_window_size();
+
+    GLFWmonitor** mons = glfwGetMonitors(&count);
+
+    for(int i=0; i < count; i++)
+    {
+        int mon_x_pos = 0;
+        int mon_y_pos = 0;
+
+        int mon_width = 0;
+        int mon_height = 0;
+
+        glfwGetMonitorWorkarea(mons[i], &mon_x_pos, &mon_y_pos, &mon_width, &mon_height);
+
+        if(mon_x_pos == pos.x() && mon_y_pos == pos.y() &&
+           mon_width == dim.x() && mon_height == dim.y())
+            return true;
+    }
+
+    return false;
+}
+
+GLFWmonitor* get_monitor_of(vec2i pos)
+{
+    int count = 0;
+
+    GLFWmonitor** mons = glfwGetMonitors(&count);
+
+    for(int i=0; i < count; i++)
+    {
+        int mon_x_pos = 0;
+        int mon_y_pos = 0;
+
+        int mon_width = 0;
+        int mon_height = 0;
+
+        glfwGetMonitorWorkarea(mons[i], &mon_x_pos, &mon_y_pos, &mon_width, &mon_height);
+
+        if(pos.x() >= mon_x_pos && pos.x() <= mon_x_pos + mon_width &&
+           pos.y() >= mon_y_pos && pos.y() <= mon_y_pos + mon_height)
+            return mons[i];
+    }
+
+    return nullptr;
 }
 
 void glfw_backend::set_is_maximised(bool set_max)
@@ -648,10 +694,21 @@ void glfw_backend::set_is_maximised(bool set_max)
     if(is_max == set_max)
         return;
 
-    if(set_max)
-        glfwMaximizeWindow(ctx.window);
-    else
-        glfwRestoreWindow(ctx.window);
+    GLFWmonitor* found = get_monitor_of(get_window_position());
+
+    if(found == nullptr)
+        found = glfwGetPrimaryMonitor();
+
+    int mon_x_pos = 0;
+    int mon_y_pos = 0;
+
+    int mon_width = 0;
+    int mon_height = 0;
+
+    glfwGetMonitorWorkarea(found, &mon_x_pos, &mon_y_pos, &mon_width, &mon_height);
+
+    glfwSetWindowPos(ctx.window, mon_x_pos, mon_y_pos);
+    glfwSetWindowSize(ctx.window, mon_width, mon_height);
 }
 
 bool glfw_backend::is_focused()
