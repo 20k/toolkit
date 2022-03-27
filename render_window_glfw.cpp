@@ -742,6 +742,11 @@ void glfw_backend::set_is_maximised(bool set_max)
     }
 }
 
+void glfw_backend::clear_demaximise_cache()
+{
+    was_windowed_ever = false;
+}
+
 bool glfw_backend::is_focused()
 {
     return glfwGetWindowAttrib(ctx.window, GLFW_FOCUSED);
