@@ -317,6 +317,9 @@ bool glfw_backend::is_vsync()
 
 void glfw_backend::set_vsync(bool enabled)
 {
+    if(enabled == is_vsync_enabled)
+        return;
+
     if(enabled)
         glfwSwapInterval(1);
     else
