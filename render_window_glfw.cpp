@@ -631,6 +631,19 @@ std::string glfw_backend::get_key_name(int key_id)
 
     key_map[GLFW_KEY_SPACE] = "space";
 
+    key_map[GLFW_KEY_F1] = "f1";
+    key_map[GLFW_KEY_F2] = "f2";
+    key_map[GLFW_KEY_F3] = "f3";
+    key_map[GLFW_KEY_F4] = "f4";
+    key_map[GLFW_KEY_F5] = "f5";
+    key_map[GLFW_KEY_F6] = "f6";
+    key_map[GLFW_KEY_F7] = "f7";
+    key_map[GLFW_KEY_F8] = "f8";
+    key_map[GLFW_KEY_F9] = "f9";
+    key_map[GLFW_KEY_F10] = "f10";
+    key_map[GLFW_KEY_F11] = "f11";
+    key_map[GLFW_KEY_F12] = "f12";
+
     auto it = key_map.find(key_id);
 
     if(it == key_map.end())
