@@ -512,6 +512,20 @@ cl_mem_flags cl::get_flags(cl_mem in)
     return ret;
 }
 
+bool cl::requires_memory_barrier(cl::args& a1, cl::args& a2)
+{
+    for(int i=0; i < (int)a1.memory_objects.size(); i++)
+    {
+        for(int j=0; j < (int)a2.memory_objects.size(); j++)
+        {
+            if(cl::requires_memory_barrier(a1.memory_objects[i], a2.memory_objects[j]))
+                return true;
+        }
+    }
+
+    return false;
+}
+
 bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
 {
     ///do not need a memory barrier between two overlapping objects if and only if they're both read only

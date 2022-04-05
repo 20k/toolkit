@@ -175,6 +175,7 @@ namespace cl
     struct args
     {
         std::vector<std::shared_ptr<arg_base>> arg_list;
+        std::vector<cl_mem> memory_objects;
 
         template<typename T>
         inline
@@ -191,6 +192,8 @@ namespace cl
             {
                 cl_mem* ptr = &v->native_mem_object.data;
                 push_arg(cl::build_from_args(std::move(v), ptr));
+
+                memory_objects.push_back(*ptr);
             }
             else
             {
@@ -204,6 +207,8 @@ namespace cl
             arg_list.push_back(base);
         }
     };
+
+    bool requires_memory_barrier(args& a1, args& a2);
 
     struct event
     {
