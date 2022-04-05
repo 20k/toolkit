@@ -549,6 +549,22 @@ namespace cl
         device_command_queue(context& ctx, cl_command_queue_properties props = 0);
     };
 
+    ///this functions as a real unordered command queue
+    struct multi_command_queue
+    {
+        std::vector<command_queue> queues;
+        int which = 0;
+
+        multi_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
+
+        ///syncs cqueue with our queue
+        ///kind of models fork join
+        void begin_splice(cl::command_queue& cqueue);
+        void end_splice(cl::command_queue& cqueue);
+
+        command_queue& next();
+    };
+
     struct gl_rendertexture : image_base
     {
         bool acquired = false;

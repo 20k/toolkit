@@ -847,6 +847,48 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
     native_context = ctx.native_context;
 }
 
+cl::multi_command_queue::multi_command_queue(context& ctx, cl_command_queue_properties props, int queue_count)
+{
+    if(queue_count <= 0)
+        throw std::runtime_error("Must pass in >= 1 queue");
+
+    for(int i=0; i < queue_count; i++)
+    {
+        queues.emplace_back(ctx, props);
+    }
+}
+
+void cl::multi_command_queue::begin_splice(cl::command_queue& cqueue)
+{
+    cl::event marker = cqueue.enqueue_marker({});
+
+    for(int i=0; i < (int)queues.size(); i++)
+    {
+        queues[i].enqueue_marker({marker});
+    }
+}
+
+void cl::multi_command_queue::end_splice(cl::command_queue& cqueue)
+{
+    std::vector<cl::event> events;
+
+    for(int i=0; i < (int)queues.size(); i++)
+    {
+        events.push_back(queues[i].enqueue_marker({}));
+    }
+
+    cqueue.enqueue_marker(events);
+}
+
+cl::command_queue& cl::multi_command_queue::next()
+{
+    cl::command_queue& to_return = queues[which];
+
+    which = (which + 1) % queues.size();
+
+    return to_return;
+}
+
 cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
 {
     cl::event ret;
