@@ -351,7 +351,7 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
 
 void debug_build_status(cl_program prog, cl_device_id selected_device)
 {
-    cl_build_status bstatus;
+    cl_build_status bstatus = 0;
     clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
 
     if(bstatus == CL_SUCCESS)
@@ -362,7 +362,7 @@ void debug_build_status(cl_program prog, cl_device_id selected_device)
     assert(bstatus == CL_BUILD_ERROR);
 
     std::string log;
-    size_t log_size;
+    size_t log_size = 0;
 
     clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
 
@@ -462,7 +462,8 @@ void cl::program::ensure_built()
         return;
     }
 
-    cl_build_status status;
+
+    cl_build_status status = 0;
     clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
 
     if(status != CL_SUCCESS)

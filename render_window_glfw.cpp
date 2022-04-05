@@ -317,6 +317,9 @@ bool glfw_backend::is_vsync()
 
 void glfw_backend::set_vsync(bool enabled)
 {
+    if(enabled == is_vsync_enabled)
+        return;
+
     if(enabled)
         glfwSwapInterval(1);
     else
@@ -628,6 +631,19 @@ std::string glfw_backend::get_key_name(int key_id)
 
     key_map[GLFW_KEY_SPACE] = "space";
 
+    key_map[GLFW_KEY_F1] = "f1";
+    key_map[GLFW_KEY_F2] = "f2";
+    key_map[GLFW_KEY_F3] = "f3";
+    key_map[GLFW_KEY_F4] = "f4";
+    key_map[GLFW_KEY_F5] = "f5";
+    key_map[GLFW_KEY_F6] = "f6";
+    key_map[GLFW_KEY_F7] = "f7";
+    key_map[GLFW_KEY_F8] = "f8";
+    key_map[GLFW_KEY_F9] = "f9";
+    key_map[GLFW_KEY_F10] = "f10";
+    key_map[GLFW_KEY_F11] = "f11";
+    key_map[GLFW_KEY_F12] = "f12";
+
     auto it = key_map.find(key_id);
 
     if(it == key_map.end())
@@ -636,9 +652,58 @@ std::string glfw_backend::get_key_name(int key_id)
         return it->second;
 }
 
+struct monitor_info
+{
+    vec2i pos = {0,0};
+    vec2i dim = {0,0};
+
+    monitor_info(GLFWmonitor* win)
+    {
+        glfwGetMonitorPos(win, &pos.x(), &pos.y());
+
+        const GLFWvidmode* mode = glfwGetVideoMode(win);
+
+        dim = {mode->width, mode->height};
+    }
+};
+
 bool glfw_backend::is_maximised()
 {
-    return glfwGetWindowAttrib(ctx.window, GLFW_MAXIMIZED);
+    int count = 0;
+
+    vec2i pos = get_window_position();
+    vec2i dim = get_window_size();
+
+    GLFWmonitor** mons = glfwGetMonitors(&count);
+
+    for(int i=0; i < count; i++)
+    {
+        monitor_info inf(mons[i]);
+
+        if(pos.x() == inf.pos.x() && pos.y() == inf.pos.y() &&
+           dim.x() == inf.dim.x() && dim.y() == inf.dim.y())
+            return true;
+    }
+
+    return false;
+}
+
+GLFWmonitor* get_monitor_of(vec2i pos)
+{
+    int count = 0;
+
+    GLFWmonitor** mons = glfwGetMonitors(&count);
+
+    for(int i=0; i < count; i++)
+    {
+        monitor_info inf(mons[i]);
+
+        if(pos.x() >= inf.pos.x() && pos.x() <= inf.pos.x() + inf.dim.x() &&
+           pos.y() >= inf.pos.y() && pos.y() <= inf.pos.y() + inf.dim.y())
+            return mons[i];
+    }
+
+    return nullptr;
 }
 
 void glfw_backend::set_is_maximised(bool set_max)
@@ -648,10 +713,54 @@ void glfw_backend::set_is_maximised(bool set_max)
     if(is_max == set_max)
         return;
 
+    ///was windowed
     if(set_max)
-        glfwMaximizeWindow(ctx.window);
+    {
+        pre_max_pos = get_window_position();
+        pre_max_dim = get_window_size();
+
+        was_windowed_ever = true;
+
+        GLFWmonitor* found = get_monitor_of(get_window_position());
+
+        if(found == nullptr)
+            found = glfwGetPrimaryMonitor();
+
+        monitor_info inf(found);
+
+        glfwSetWindowPos(ctx.window, inf.pos.x(), inf.pos.y());
+        glfwSetWindowSize(ctx.window, inf.dim.x(), inf.dim.y());
+    }
     else
-        glfwRestoreWindow(ctx.window);
+    {
+        if(was_windowed_ever)
+        {
+            glfwSetWindowPos(ctx.window, pre_max_pos.x(), pre_max_pos.y());
+            glfwSetWindowSize(ctx.window, pre_max_dim.x(), pre_max_dim.y());
+        }
+        else
+        {
+            GLFWmonitor* found = get_monitor_of(get_window_position());
+
+            if(found == nullptr)
+                found = glfwGetPrimaryMonitor();
+
+            monitor_info inf(found);
+
+            vec2i new_start = inf.pos + inf.dim / 4;
+            vec2i new_end = inf.pos + inf.dim - inf.dim / 4;
+
+            vec2i new_dim = new_end - new_start;
+
+            glfwSetWindowPos(ctx.window, new_start.x(), new_start.y());
+            glfwSetWindowSize(ctx.window, new_dim.x(), new_dim.y());
+        }
+    }
+}
+
+void glfw_backend::clear_demaximise_cache()
+{
+    was_windowed_ever = false;
 }
 
 bool glfw_backend::is_focused()

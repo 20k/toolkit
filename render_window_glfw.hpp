@@ -35,6 +35,10 @@ struct glfw_render_context
 
 struct glfw_backend : generic_backend
 {
+    vec2i pre_max_pos;
+    vec2i pre_max_dim;
+    bool was_windowed_ever = false;
+
     glfw_render_context ctx;
     opencl_context* clctx = nullptr;
 
@@ -64,6 +68,7 @@ struct glfw_backend : generic_backend
     std::string get_key_name(int key_id) override;
     bool is_maximised() override;
     void set_is_maximised(bool set_max) override;
+    void clear_demaximise_cache() override;
     bool is_focused() override;
 
     bool has_dropped_file() override;
