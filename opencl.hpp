@@ -169,6 +169,9 @@ namespace cl
         return std::dynamic_pointer_cast<arg_base>(shared);
     }
 
+    struct command_queue;
+    struct mem_object;
+
     struct args
     {
         std::vector<std::shared_ptr<arg_base>> arg_list;
@@ -178,11 +181,22 @@ namespace cl
         void push_back(const T& val)
         {
             std::unique_ptr<T> v = std::make_unique<T>(val);
-            T* data = v.get();
 
-            std::shared_ptr<arg_base> base = build_from_args(std::move(v), data);
-
-            push_arg(base);
+            if constexpr(std::is_base_of_v<command_queue, T>)
+            {
+                cl_command_queue* ptr = &v->native_commmand_queue.data;
+                push_arg(cl::build_from_args(std::move(v), ptr));
+            }
+            else if constexpr(std::is_base_of_v<mem_object, T>)
+            {
+                cl_mem* ptr = &v->native_mem_object.data;
+                push_arg(cl::build_from_args(std::move(v), ptr));
+            }
+            else
+            {
+                auto* ptr = v.get();
+                push_arg(cl::build_from_args(std::move(v), ptr));
+            }
         }
 
         void push_arg(const std::shared_ptr<arg_base>& base)
@@ -653,76 +667,6 @@ namespace cl
     bool supports_extension(context& ctx, const std::string& name);
 
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
-}
-
-template<>
-inline
-void cl::args::push_back<cl::command_queue>(const cl::command_queue& val)
-{
-    std::unique_ptr<cl::command_queue> uptr = std::make_unique<cl::command_queue>(val);
-    cl_command_queue* ptr = &uptr->native_command_queue.data;
-
-    push_arg(cl::build_from_args(std::move(uptr), ptr));
-}
-
-template<>
-inline
-void cl::args::push_back<cl::device_command_queue>(const cl::device_command_queue& val)
-{
-    std::unique_ptr<cl::device_command_queue> uptr = std::make_unique<cl::device_command_queue>(val);
-    cl_command_queue* ptr = &uptr->native_command_queue.data;
-
-    push_arg(cl::build_from_args(std::move(uptr), ptr));
-}
-
-template<>
-inline
-void cl::args::push_back<cl::mem_object>(const cl::mem_object& val)
-{
-    std::unique_ptr<cl::mem_object> uptr = std::make_unique<cl::mem_object>(val);
-    cl_mem* ptr = &uptr->native_mem_object.data;
-
-    push_arg(cl::build_from_args(std::move(uptr), ptr));
-}
-
-template<>
-inline
-void cl::args::push_back<cl::buffer>(const cl::buffer& val)
-{
-    std::unique_ptr<cl::buffer> uptr = std::make_unique<cl::buffer>(val);
-    cl_mem* ptr = &uptr->native_mem_object.data;
-
-    push_arg(cl::build_from_args(std::move(uptr), ptr));
-}
-
-template<>
-inline
-void cl::args::push_back<cl::gl_rendertexture>(const cl::gl_rendertexture& val)
-{
-    std::unique_ptr<cl::gl_rendertexture> uptr = std::make_unique<cl::gl_rendertexture>(val);
-    cl_mem* ptr = &uptr->native_mem_object.data;
-
-    push_arg(cl::build_from_args(std::move(uptr), ptr));
-}
-
-template<>
-inline
-void cl::args::push_back<cl::image>(const cl::image& val)
-{
-    std::unique_ptr<cl::image> uptr = std::make_unique<cl::image>(val);
-    cl_mem* ptr = &uptr->native_mem_object.data;
-
-    push_arg(cl::build_from_args(std::move(uptr), ptr));
-}
-
-template<>
-inline
-void cl::args::push_back<cl::image_with_mipmaps>(const cl::image_with_mipmaps& val)
-{
-    std::unique_ptr<cl::image_with_mipmaps> uptr = std::make_unique<cl::image_with_mipmaps>(val);
-    cl_mem* ptr = &uptr->native_mem_object.data;
-
-    push_arg(cl::build_from_args(std::move(uptr), ptr));
 }
 
 #endif // OPENCL_HPP_INCLUDED
