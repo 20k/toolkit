@@ -482,6 +482,14 @@ void cl::program::cancel()
     async->cancelled = true;
 }
 
+cl_mem_flags cl::mem_object::get_flags()
+{
+    cl_mem_flags ret = 0;
+    clGetMemObjectInfo(native_mem_object.data, CL_MEM_FLAGS, sizeof(cl_mem_flags), &ret, nullptr);
+
+    return ret;
+}
+
 cl::buffer::buffer(cl::context& ctx)
 {
     native_context = ctx.native_context;

@@ -266,6 +266,8 @@ namespace cl
     struct mem_object
     {
         base<cl_mem, clRetainMemObject, clReleaseMemObject> native_mem_object;
+
+        cl_mem_flags get_flags();
     };
 
     template<typename T>
