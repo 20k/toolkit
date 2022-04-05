@@ -14,7 +14,7 @@
 #include <variant>
 #include <string_view>
 #include <atomic>
-#include <thread>
+#include <optional>
 
 namespace cl
 {
@@ -268,7 +268,11 @@ namespace cl
         base<cl_mem, clRetainMemObject, clReleaseMemObject> native_mem_object;
 
         cl_mem_flags get_flags();
+        std::optional<cl_mem> get_parent();
     };
+
+    std::optional<cl_mem> get_parent(cl_mem in);
+    cl_mem_flags get_flags(cl_mem in);
 
     template<typename T>
     struct read_info

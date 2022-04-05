@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <assert.h>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -484,8 +485,29 @@ void cl::program::cancel()
 
 cl_mem_flags cl::mem_object::get_flags()
 {
+    return cl::get_flags(native_mem_object.data);
+}
+
+std::optional<cl_mem> cl::mem_object::get_parent()
+{
+    return cl::get_parent(native_mem_object.data);
+}
+
+std::optional<cl_mem> cl::get_parent(cl_mem in)
+{
+    cl_mem ret;
+    clGetMemObjectInfo(in, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(cl_mem), &ret, nullptr);
+
+    if(ret == nullptr)
+        return std::nullopt;
+
+    return ret;
+}
+
+cl_mem_flags cl::get_flags(cl_mem in)
+{
     cl_mem_flags ret = 0;
-    clGetMemObjectInfo(native_mem_object.data, CL_MEM_FLAGS, sizeof(cl_mem_flags), &ret, nullptr);
+    clGetMemObjectInfo(in, CL_MEM_FLAGS, sizeof(cl_mem_flags), &ret, nullptr);
 
     return ret;
 }
