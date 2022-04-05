@@ -205,9 +205,6 @@ namespace cl
             }
             else if constexpr(std::is_base_of_v<mem_object, T>)
             {
-                cl_mem* ptr = &v->native_mem_object.data;
-                push_arg(cl::build_from_args(std::move(v), ptr));
-
                 if(type == mem_object_access::NONE)
                 {
                     memory_objects.push_back(base<cl_mem, clRetainMemObject, clReleaseMemObject>());
@@ -216,6 +213,9 @@ namespace cl
                 {
                     memory_objects.push_back(v->native_mem_object);
                 }
+
+                cl_mem* ptr = &v->native_mem_object.data;
+                push_arg(cl::build_from_args(std::move(v), ptr));
             }
             else
             {
@@ -408,15 +408,15 @@ namespace cl
             return ret;
         }
 
-        void set_to_zero(command_queue& write_on);
-        void fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size);
+        cl::event set_to_zero(command_queue& write_on);
+        cl::event fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size);
 
         template<typename T>
-        void fill(command_queue& write_on, const T& value)
+        cl::event fill(command_queue& write_on, const T& value)
         {
             assert((alloc_size % sizeof(T)) == 0);
 
-            fill(write_on, (void*)&value, sizeof(T), alloc_size);
+            return fill(write_on, (void*)&value, sizeof(T), alloc_size);
         }
 
         template<typename T>
@@ -655,7 +655,10 @@ namespace cl
         void begin_splice(cl::command_queue& cqueue);
         void end_splice(cl::command_queue& cqueue);
 
-        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
+        void getting_value_depends_on(cl::mem_object& obj, cl::event& evt);
+        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
+
+        void flush();
     };
 
     struct gl_rendertexture : image_base

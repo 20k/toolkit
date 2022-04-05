@@ -676,26 +676,34 @@ cl::event cl::buffer::read_async(cl::command_queue& read_on, char* ptr, int64_t 
     return evt;
 }
 
-void cl::buffer::set_to_zero(cl::command_queue& write_on)
+cl::event cl::buffer::set_to_zero(cl::command_queue& write_on)
 {
     static int zero = 0;
 
-    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, (const void*)&zero, 1, 0, alloc_size, 0, nullptr, nullptr);
+    cl::event evt;
+
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, (const void*)&zero, 1, 0, alloc_size, 0, nullptr, &evt.native_event.data);
 
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not set_to_zero");
     }
+
+    return evt;
 }
 
-void cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size)
+cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size)
 {
-    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, 0, nullptr, nullptr);
+    cl::event evt;
+
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, 0, nullptr, &evt.native_event.data);
 
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not fill buffer");
     }
+
+    return evt;
 }
 
 cl::buffer cl::buffer::as_device_read_only()
@@ -991,6 +999,11 @@ void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
     mqueue.end_splice(cqueue);
 }
 
+void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, cl::event& evt)
+{
+    event_history.push_back({evt, {obj.native_mem_object}});
+}
+
 cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
 {
     for(int i=0; i < (int)event_history.size(); i++)
@@ -1025,6 +1038,14 @@ cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, 
     event_history.push_back({my_event, pack.memory_objects});
 
     return my_event;
+}
+
+void cl::managed_command_queue::flush()
+{
+    for(cl::command_queue& q : mqueue.queues)
+    {
+        q.flush();
+    }
 }
 
 cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
