@@ -512,6 +512,29 @@ cl_mem_flags cl::get_flags(cl_mem in)
     return ret;
 }
 
+bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
+{
+    ///do not need a memory barrier between two overlapping objects if and only if they're both read only
+    if((flag1 & CL_MEM_READ_ONLY) && (flag2 & CL_MEM_READ_ONLY))
+        return false;
+
+    return true;
+}
+
+bool cl::requires_memory_barrier(cl_mem in1, cl_mem in2)
+{
+    std::optional<cl_mem> parent1 = cl::get_parent(in1);
+    std::optional<cl_mem> parent2 = cl::get_parent(in2);
+
+    cl_mem to_check1 = parent1.value_or(in1);
+    cl_mem to_check2 = parent2.value_or(in2);
+
+    if(to_check1 == to_check2)
+        return requires_memory_barrier_raw(cl::get_flags(in1), cl::get_flags(in2));
+
+    return false;
+}
+
 cl::buffer::buffer(cl::context& ctx)
 {
     native_context = ctx.native_context;

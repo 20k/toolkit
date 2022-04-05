@@ -274,6 +274,8 @@ namespace cl
     std::optional<cl_mem> get_parent(cl_mem in);
     cl_mem_flags get_flags(cl_mem in);
 
+    bool requires_memory_barrier(cl_mem in1, cl_mem in2);
+
     template<typename T>
     struct read_info
     {
