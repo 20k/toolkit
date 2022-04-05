@@ -436,6 +436,7 @@ namespace cl
 
         cl::buffer as_device_read_only();
         cl::buffer as_device_write_only();
+        cl::buffer as_device_inaccessible();
     };
 
     struct image_base : mem_object

@@ -742,6 +742,15 @@ cl::buffer cl::buffer::as_device_write_only()
     return buf;
 }
 
+cl::buffer cl::buffer::as_device_inaccessible()
+{
+    cl::buffer buf = *this;
+    buf.alloc_size = 0;
+    buf.native_mem_object.release();
+
+    return buf;
+}
+
 cl::image::image(cl::context& ctx)
 {
     native_context = ctx.native_context;
