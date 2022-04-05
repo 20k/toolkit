@@ -997,18 +997,20 @@ void cl::managed_command_queue::begin_splice(cl::command_queue& cqueue)
 void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
 {
     mqueue.end_splice(cqueue);
+
+    event_history.clear();
 }
 
 void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, cl::event& evt)
 {
-    event_history.push_back({evt, {obj.native_mem_object}});
+    event_history.push_back({evt, {obj.native_mem_object}, "manual_depend"});
 }
 
 cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
 {
     for(int i=0; i < (int)event_history.size(); i++)
     {
-        cl::event& test = event_history[i].first;
+        cl::event& test = std::get<0>(event_history[i]);
 
         if(test.is_finished())
         {
@@ -1022,20 +1024,26 @@ cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, 
 
     for(int i=0; i < (int)event_history.size(); i++)
     {
-        const cl::event& evt = event_history[i].first;
-        const std::vector<cl::shared_mem_object>& args = event_history[i].second;
+        const cl::event& evt = std::get<0>(event_history[i]);
+        const std::vector<cl::shared_mem_object>& args = std::get<1>(event_history[i]);
+        const std::string& tag = std::get<2>(event_history[i]);
 
         if(cl::requires_memory_barrier(pack.memory_objects, args))
         {
             prior_deps.push_back(evt);
+
+            //std::cout << "kname has dep " << kname << " on " << tag << std::endl;
         }
     }
 
     prior_deps.insert(prior_deps.end(), deps.begin(), deps.end());
 
-    cl::event my_event = mqueue.next().exec(kname, pack, global_ws, local_ws, prior_deps);
+    cl::command_queue& exec_on = mqueue.next();
 
-    event_history.push_back({my_event, pack.memory_objects});
+    cl::event my_event = exec_on.exec(kname, pack, global_ws, local_ws, prior_deps);
+    exec_on.flush();
+
+    event_history.push_back({my_event, pack.memory_objects, kname});
 
     return my_event;
 }

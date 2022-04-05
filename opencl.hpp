@@ -648,7 +648,7 @@ namespace cl
     struct managed_command_queue
     {
         multi_command_queue mqueue;
-        std::vector<std::pair<cl::event, std::vector<shared_mem_object>>> event_history;
+        std::vector<std::tuple<cl::event, std::vector<shared_mem_object>, std::string>> event_history;
 
         managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
 
