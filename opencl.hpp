@@ -169,6 +169,8 @@ namespace cl
         return std::dynamic_pointer_cast<arg_base>(shared);
     }
 
+    using shared_mem_object = base<cl_mem, clRetainMemObject, clReleaseMemObject>;
+
     struct command_queue;
     struct mem_object;
 
@@ -188,7 +190,7 @@ namespace cl
     struct args
     {
         std::vector<std::shared_ptr<arg_base>> arg_list;
-        std::vector<base<cl_mem, clRetainMemObject, clReleaseMemObject>> memory_objects;
+        std::vector<shared_mem_object> memory_objects;
 
         template<typename T>
         inline
@@ -258,6 +260,7 @@ namespace cl
     };
 
     bool requires_memory_barrier(args& a1, args& a2);
+    bool requires_memory_barrier(const std::vector<shared_mem_object>& a1, const std::vector<shared_mem_object>& a2);
 
     struct event
     {
@@ -333,7 +336,7 @@ namespace cl
 
     struct mem_object
     {
-        base<cl_mem, clRetainMemObject, clReleaseMemObject> native_mem_object;
+        shared_mem_object native_mem_object;
 
         cl_mem_flags get_flags();
         std::optional<cl_mem> get_parent();
@@ -639,6 +642,20 @@ namespace cl
         void end_splice(cl::command_queue& cqueue);
 
         command_queue& next();
+    };
+
+    ///uses buffer info to execute things out of order
+    struct managed_command_queue
+    {
+        multi_command_queue mqueue;
+        std::vector<std::pair<cl::event, std::vector<shared_mem_object>>> event_history;
+
+        managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
+
+        void begin_splice(cl::command_queue& cqueue);
+        void end_splice(cl::command_queue& cqueue);
+
+        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
     };
 
     struct gl_rendertexture : image_base

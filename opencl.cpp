@@ -528,11 +528,16 @@ cl_mem_flags cl::get_flags(cl_mem in)
 
 bool cl::requires_memory_barrier(cl::args& a1, cl::args& a2)
 {
-    for(int i=0; i < (int)a1.memory_objects.size(); i++)
+    return requires_memory_barrier(a1.memory_objects, a2.memory_objects);
+}
+
+bool cl::requires_memory_barrier(const std::vector<shared_mem_object>& a1, const std::vector<shared_mem_object>& a2)
+{
+    for(int i=0; i < (int)a1.size(); i++)
     {
-        for(int j=0; j < (int)a2.memory_objects.size(); j++)
+        for(int j=0; j < (int)a2.size(); j++)
         {
-            if(cl::requires_memory_barrier(a1.memory_objects[i].data, a2.memory_objects[j].data))
+            if(cl::requires_memory_barrier(a1[i].data, a2[j].data))
                 return true;
         }
     }
@@ -972,6 +977,54 @@ cl::command_queue& cl::multi_command_queue::next()
     which = (which + 1) % queues.size();
 
     return to_return;
+}
+
+cl::managed_command_queue::managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count) : mqueue(ctx, props, queue_count){}
+
+void cl::managed_command_queue::begin_splice(cl::command_queue& cqueue)
+{
+    mqueue.begin_splice(cqueue);
+}
+
+void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
+{
+    mqueue.end_splice(cqueue);
+}
+
+cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+{
+    for(int i=0; i < (int)event_history.size(); i++)
+    {
+        cl::event& test = event_history[i].first;
+
+        if(test.is_finished())
+        {
+            event_history.erase(event_history.begin() + i);
+            i--;
+            continue;
+        }
+    }
+
+    std::vector<cl::event> prior_deps;
+
+    for(int i=0; i < (int)event_history.size(); i++)
+    {
+        const cl::event& evt = event_history[i].first;
+        const std::vector<cl::shared_mem_object>& args = event_history[i].second;
+
+        if(cl::requires_memory_barrier(pack.memory_objects, args))
+        {
+            prior_deps.push_back(evt);
+        }
+    }
+
+    prior_deps.insert(prior_deps.end(), deps.begin(), deps.end());
+
+    cl::event my_event = mqueue.next().exec(kname, pack, global_ws, local_ws, prior_deps);
+
+    event_history.push_back({my_event, pack.memory_objects});
+
+    return my_event;
 }
 
 cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
