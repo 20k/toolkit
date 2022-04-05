@@ -172,6 +172,19 @@ namespace cl
     struct command_queue;
     struct mem_object;
 
+    namespace mem_object_access
+    {
+        enum type
+        {
+            READ_WRITE,
+            READ,
+            WRITE,
+            NONE
+        };
+    }
+
+    //mem_object_access get_narrowest_access_specifier(cl_mem, mem_object_access::type specified);
+
     struct args
     {
         std::vector<std::shared_ptr<arg_base>> arg_list;
@@ -179,7 +192,7 @@ namespace cl
 
         template<typename T>
         inline
-        void push_back(const T& val)
+        void push_back_base(const T& val, mem_object_access::type type = mem_object_access::READ_WRITE)
         {
             std::unique_ptr<T> v = std::make_unique<T>(val);
 
@@ -193,13 +206,49 @@ namespace cl
                 cl_mem* ptr = &v->native_mem_object.data;
                 push_arg(cl::build_from_args(std::move(v), ptr));
 
-                memory_objects.push_back(v->native_mem_object);
+                if(type == mem_object_access::NONE)
+                {
+                    memory_objects.push_back(base<cl_mem, clRetainMemObject, clReleaseMemObject>());
+                }
+                else
+                {
+                    memory_objects.push_back(v->native_mem_object);
+                }
             }
             else
             {
                 auto* ptr = v.get();
                 push_arg(cl::build_from_args(std::move(v), ptr));
             }
+        }
+
+        template<typename T>
+        inline
+        void push_back(const T& val)
+        {
+            return push_back_base(val, mem_object_access::READ_WRITE);
+        }
+
+        template<typename T>
+        inline
+        void push_back_writable(const T& val)
+        {
+            return push_back_base(val, mem_object_access::WRITE);
+        }
+
+        template<typename T>
+        inline
+        void push_back_readable(const T& val)
+        {
+            return push_back_base(val, mem_object_access::READ);
+        }
+
+        template<typename T>
+        inline
+        void push_back_noaccess(const T& val)
+        {
+            ///push a nullptr?
+            return push_back_base(val, mem_object_access::NONE);
         }
 
         void push_arg(const std::shared_ptr<arg_base>& base)

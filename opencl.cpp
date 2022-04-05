@@ -493,6 +493,20 @@ std::optional<cl_mem> cl::mem_object::get_parent()
     return cl::get_parent(native_mem_object.data);
 }
 
+/*cl::mem_object_access cl::get_narrowest_access_specifier(cl_mem in, mem_object_access::type specified)
+{
+    if(specified == cl::mem_object_access::NONE)
+        return cl::mem_object_access::NONE;
+
+    cl_mem_flags flags = cl::get_flags(in);
+
+    if(specified == cl::mem_object_access::READ && (flags & CL_MEM_READ_ONLY))
+        return specified;
+
+    if(specified == cl::mem_object_access::WRITE && (flags & CL_MEM_WRITE_ONLY))
+        return specified;
+}*/
+
 std::optional<cl_mem> cl::get_parent(cl_mem in)
 {
     cl_mem ret;
@@ -537,6 +551,9 @@ bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
 
 bool cl::requires_memory_barrier(cl_mem in1, cl_mem in2)
 {
+    if(in1 == nullptr || in2 == nullptr)
+        return false;
+
     std::optional<cl_mem> parent1 = cl::get_parent(in1);
     std::optional<cl_mem> parent2 = cl::get_parent(in2);
 
