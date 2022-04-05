@@ -518,7 +518,7 @@ bool cl::requires_memory_barrier(cl::args& a1, cl::args& a2)
     {
         for(int j=0; j < (int)a2.memory_objects.size(); j++)
         {
-            if(cl::requires_memory_barrier(a1.memory_objects[i], a2.memory_objects[j]))
+            if(cl::requires_memory_barrier(a1.memory_objects[i].data, a2.memory_objects[j].data))
                 return true;
         }
     }

@@ -175,7 +175,7 @@ namespace cl
     struct args
     {
         std::vector<std::shared_ptr<arg_base>> arg_list;
-        std::vector<cl_mem> memory_objects;
+        std::vector<base<cl_mem, clRetainMemObject, clReleaseMemObject>> memory_objects;
 
         template<typename T>
         inline
@@ -193,7 +193,7 @@ namespace cl
                 cl_mem* ptr = &v->native_mem_object.data;
                 push_arg(cl::build_from_args(std::move(v), ptr));
 
-                memory_objects.push_back(*ptr);
+                memory_objects.push_back(v->native_mem_object);
             }
             else
             {
