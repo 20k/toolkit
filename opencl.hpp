@@ -187,10 +187,18 @@ namespace cl
 
     //mem_object_access get_narrowest_access_specifier(cl_mem, mem_object_access::type specified);
 
+    ///todo: cl_mem here might expire
+    struct access_storage
+    {
+        std::map<cl_mem, std::vector<cl_mem_flags>> store;
+
+        void add(cl_mem in);
+    };
+
     struct args
     {
         std::vector<std::shared_ptr<arg_base>> arg_list;
-        std::vector<shared_mem_object> memory_objects;
+        access_storage memory_objects;
 
         template<typename T>
         inline
@@ -205,13 +213,9 @@ namespace cl
             }
             else if constexpr(std::is_base_of_v<mem_object, T>)
             {
-                if(type == mem_object_access::NONE)
+                if(type != mem_object_access::NONE && v->native_mem_object.data != nullptr)
                 {
-                    memory_objects.push_back(base<cl_mem, clRetainMemObject, clReleaseMemObject>());
-                }
-                else
-                {
-                    memory_objects.push_back(v->native_mem_object);
+                    memory_objects.add(v->native_mem_object.data);
                 }
 
                 cl_mem* ptr = &v->native_mem_object.data;
@@ -649,7 +653,7 @@ namespace cl
     struct managed_command_queue
     {
         multi_command_queue mqueue;
-        std::vector<std::tuple<cl::event, std::vector<shared_mem_object>, std::string>> event_history;
+        std::vector<std::tuple<cl::event, access_storage, std::string>> event_history;
 
         managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
 

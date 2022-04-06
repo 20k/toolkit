@@ -12,6 +12,7 @@
 #include <iostream>
 #include <assert.h>
 #include <thread>
+#include "clock.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -526,12 +527,12 @@ cl_mem_flags cl::get_flags(cl_mem in)
     return ret;
 }
 
-bool cl::requires_memory_barrier(cl::args& a1, cl::args& a2)
+/*bool cl::requires_memory_barrier(cl::args& a1, cl::args& a2)
 {
     return requires_memory_barrier(a1.memory_objects, a2.memory_objects);
-}
+}*/
 
-bool cl::requires_memory_barrier(const std::vector<shared_mem_object>& a1, const std::vector<shared_mem_object>& a2)
+/*bool cl::requires_memory_barrier(const std::vector<shared_mem_object>& a1, const std::vector<shared_mem_object>& a2)
 {
     for(int i=0; i < (int)a1.size(); i++)
     {
@@ -543,7 +544,7 @@ bool cl::requires_memory_barrier(const std::vector<shared_mem_object>& a1, const
     }
 
     return false;
-}
+}*/
 
 bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
 {
@@ -569,6 +570,77 @@ bool cl::requires_memory_barrier(cl_mem in1, cl_mem in2)
         return requires_memory_barrier_raw(cl::get_flags(in1), cl::get_flags(in2));
 
     return false;
+}
+
+std::pair<cl_mem, cl_mem_flags> get_barrier_vars(cl_mem in);
+
+void cl::access_storage::add(cl_mem in)
+{
+    auto vars = get_barrier_vars(in);
+
+    store[vars.first].push_back(vars.second);
+}
+
+bool requires_memory_barrier_sorted(const cl::access_storage& base, const cl::access_storage& theirs)
+{
+    for(auto& [mem, flags] : theirs.store)
+    {
+        auto it = base.store.find(mem);
+
+        if(it == base.store.end())
+            continue;
+
+        for(cl_mem_flags f : it->second)
+        {
+            for(cl_mem_flags g : flags)
+            {
+                if(requires_memory_barrier_raw(f, g))
+                    return true;
+            }
+        }
+    }
+
+    return false;
+
+    /*for(int i=0; i < (int)base.size(); i++)
+    {
+        for(int j=0; j < (int)theirs.size(); j++)
+        {
+            if(base[i].first != theirs[j].first)
+                continue;
+
+            if(base[i].first == nullptr)
+                continue;
+
+            if(theirs[j].first == nullptr)
+                continue;
+
+            if(requires_memory_barrier_raw(base[i].second, theirs[j].second))
+                return true;
+        }
+    }*/
+
+    return false;
+}
+
+std::pair<cl_mem, cl_mem_flags> get_barrier_vars(cl_mem in)
+{
+    if(in == nullptr)
+        return {nullptr, cl::mem_object_access::NONE};
+
+    std::optional<cl_mem> parent1 = cl::get_parent(in);
+
+    cl_mem_flags flags = cl::get_flags(in);
+
+    return {parent1.value_or(in), flags};
+}
+
+bool requires_memory_barrier(cl_mem base1, cl_mem_flags flags1, cl_mem base2, cl_mem_flags flags2)
+{
+    if(base1 != base2)
+        return false;
+
+    return requires_memory_barrier_raw(flags1, flags2);
 }
 
 cl::buffer::buffer(cl::context& ctx)
@@ -1012,7 +1084,10 @@ void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
 
 void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, cl::event& evt)
 {
-    event_history.push_back({evt, {obj.native_mem_object}, "manual_depend"});
+    cl::access_storage store;
+    store.add(obj.native_mem_object.data);
+
+    event_history.push_back({evt, store, "manual_depend"});
 }
 
 cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
@@ -1036,10 +1111,12 @@ cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, 
     for(int i=0; i < (int)event_history.size(); i++)
     {
         const cl::event& evt = std::get<0>(event_history[i]);
-        const std::vector<cl::shared_mem_object>& args = std::get<1>(event_history[i]);
+        const access_storage& args = std::get<1>(event_history[i]);
         const std::string& tag = std::get<2>(event_history[i]);
 
-        if(cl::requires_memory_barrier(pack.memory_objects, args))
+        //assert(cl::requires_memory_barrier(pack.memory_objects, args) == requires_memory_barrier_sorted(my_barrier_vars, their_vars));
+
+        if(requires_memory_barrier_sorted(pack.memory_objects, args))
         {
             prior_deps.push_back(evt);
 
