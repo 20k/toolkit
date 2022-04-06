@@ -1031,6 +1031,8 @@ cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, 
 
     std::vector<cl::event> prior_deps;
 
+    ///todo: make this not n^really bad
+    ///dechildify, then take the intersection
     for(int i=0; i < (int)event_history.size(); i++)
     {
         const cl::event& evt = std::get<0>(event_history[i]);
