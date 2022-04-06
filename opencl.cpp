@@ -494,20 +494,6 @@ std::optional<cl_mem> cl::mem_object::get_parent()
     return cl::get_parent(native_mem_object.data);
 }
 
-/*cl::mem_object_access cl::get_narrowest_access_specifier(cl_mem in, mem_object_access::type specified)
-{
-    if(specified == cl::mem_object_access::NONE)
-        return cl::mem_object_access::NONE;
-
-    cl_mem_flags flags = cl::get_flags(in);
-
-    if(specified == cl::mem_object_access::READ && (flags & CL_MEM_READ_ONLY))
-        return specified;
-
-    if(specified == cl::mem_object_access::WRITE && (flags & CL_MEM_WRITE_ONLY))
-        return specified;
-}*/
-
 std::optional<cl_mem> cl::get_parent(cl_mem in)
 {
     cl_mem ret;
@@ -526,25 +512,6 @@ cl_mem_flags cl::get_flags(cl_mem in)
 
     return ret;
 }
-
-/*bool cl::requires_memory_barrier(cl::args& a1, cl::args& a2)
-{
-    return requires_memory_barrier(a1.memory_objects, a2.memory_objects);
-}*/
-
-/*bool cl::requires_memory_barrier(const std::vector<shared_mem_object>& a1, const std::vector<shared_mem_object>& a2)
-{
-    for(int i=0; i < (int)a1.size(); i++)
-    {
-        for(int j=0; j < (int)a2.size(); j++)
-        {
-            if(cl::requires_memory_barrier(a1[i].data, a2[j].data))
-                return true;
-        }
-    }
-
-    return false;
-}*/
 
 bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
 {
@@ -601,46 +568,17 @@ bool requires_memory_barrier_sorted(const cl::access_storage& base, const cl::ac
     }
 
     return false;
-
-    /*for(int i=0; i < (int)base.size(); i++)
-    {
-        for(int j=0; j < (int)theirs.size(); j++)
-        {
-            if(base[i].first != theirs[j].first)
-                continue;
-
-            if(base[i].first == nullptr)
-                continue;
-
-            if(theirs[j].first == nullptr)
-                continue;
-
-            if(requires_memory_barrier_raw(base[i].second, theirs[j].second))
-                return true;
-        }
-    }*/
-
-    return false;
 }
 
 std::pair<cl_mem, cl_mem_flags> get_barrier_vars(cl_mem in)
 {
-    if(in == nullptr)
-        return {nullptr, cl::mem_object_access::NONE};
+    assert(in);
 
     std::optional<cl_mem> parent1 = cl::get_parent(in);
 
     cl_mem_flags flags = cl::get_flags(in);
 
     return {parent1.value_or(in), flags};
-}
-
-bool requires_memory_barrier(cl_mem base1, cl_mem_flags flags1, cl_mem base2, cl_mem_flags flags2)
-{
-    if(base1 != base2)
-        return false;
-
-    return requires_memory_barrier_raw(flags1, flags2);
 }
 
 cl::buffer::buffer(cl::context& ctx)

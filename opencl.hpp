@@ -185,8 +185,6 @@ namespace cl
         };
     }
 
-    //mem_object_access get_narrowest_access_specifier(cl_mem, mem_object_access::type specified);
-
     ///todo: cl_mem here might expire
     struct access_storage
     {
