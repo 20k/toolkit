@@ -1429,5 +1429,28 @@ bool cl::supports_extension(cl::context& ctx, const std::string& name)
     return extensions.find(name) != std::string::npos;
 }
 
+std::vector<char> cl::get_device_info(cl_device_id id, cl_device_info param)
+{
+    std::vector<char> ret;
+
+    size_t size = 0;
+
+    cl_int err = clGetDeviceInfo(id, param, 0, nullptr, &size);
+
+    if(err != CL_SUCCESS)
+        throw std::runtime_error("Error " + std::to_string(err) + " in get_device_info");
+
+    if(size == 0)
+        return ret;
+
+    ret.resize(size);
+
+    err = clGetDeviceInfo(id, param, ret.size(), ret.data(), nullptr);
+
+    if(err != CL_SUCCESS)
+        throw std::runtime_error("Error " + std::to_string(err) + " in get_device_info 2");
+
+    return ret;
+}
 
 #endif // NO_OPENCL

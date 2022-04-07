@@ -743,6 +743,21 @@ namespace cl
     std::string get_extensions(context& ctx);
     bool supports_extension(context& ctx, const std::string& name);
 
+    std::vector<char> get_device_info(cl_device_id id, cl_device_info param);
+
+    template<typename T>
+    inline
+    T get_device_info(cl_device_id id, cl_device_info param)
+    {
+        T ret = T();
+
+        std::vector<char> value = get_device_info(id, param);
+
+        memcpy(&ret, value.data(), value.size() * sizeof(char));
+
+        return ret;
+    }
+
     //cl_event exec_1d(cl_command_queue cqueue, cl_kernel kernel, const std::vector<cl_mem>& args, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<cl_event>& waitlist);
 }
 
