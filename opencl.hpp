@@ -437,6 +437,8 @@ namespace cl
             return ret;
         }
 
+        cl::buffer as_read_only();
+        cl::buffer as_write_only();
         cl::buffer as_device_read_only();
         cl::buffer as_device_write_only();
         cl::buffer as_device_inaccessible();
