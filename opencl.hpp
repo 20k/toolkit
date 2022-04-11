@@ -393,6 +393,7 @@ namespace cl
         event write_async(command_queue& write_on, const char* ptr, int64_t bytes);
 
         void read(command_queue& read_on, char* ptr, int64_t bytes);
+        void read(command_queue& read_on, char* ptr, int64_t bytes, int64_t offset);
 
         event read_async(command_queue& read_on, char* ptr, int64_t bytes, const std::vector<cl::event>& wait_on);
 

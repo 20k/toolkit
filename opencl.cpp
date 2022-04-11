@@ -648,9 +648,14 @@ cl::event cl::buffer::write_async(cl::command_queue& write_on, const char* ptr, 
 
 void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes)
 {
-    assert(bytes <= alloc_size);
+    return read(read_on, ptr, bytes, 0);
+}
 
-    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_TRUE, 0, bytes, ptr, 0, nullptr, nullptr);
+void cl::buffer::read(cl::command_queue& read_on, char* ptr, int64_t bytes, int64_t offset)
+{
+    assert((bytes + offset) <= alloc_size);
+
+    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_TRUE, offset, bytes, ptr, 0, nullptr, nullptr);
 
     if(val != CL_SUCCESS)
     {
