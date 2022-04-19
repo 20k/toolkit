@@ -658,13 +658,34 @@ namespace cl
 
         managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
 
+        std::vector<cl::event> get_dependencies(cl::mem_object& obj);
+
         void begin_splice(cl::command_queue& cqueue);
         void end_splice(cl::command_queue& cqueue);
 
-        void getting_value_depends_on(cl::mem_object& obj, cl::event& evt);
+        void getting_value_depends_on(cl::mem_object& obj, const cl::event& evt);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
 
         void flush();
+
+        template<typename T>
+        cl::event add(const T& func, cl::mem_object& obj, const std::vector<cl::event>& events)
+        {
+            std::vector<cl::event> evts = get_dependencies(obj);
+
+            evts.insert(evts.end(), events.begin(), events.end());
+
+            cl::command_queue& exec_on = mqueue.next();
+
+            cl::event next = func(exec_on, events);
+
+            cl::access_storage store;
+            store.add(obj.native_mem_object.data);
+
+            event_history.push_back({next, store, "generic"});
+
+            return next;
+        }
     };
 
     struct gl_rendertexture : image_base
@@ -686,6 +707,9 @@ namespace cl
 
         event acquire(command_queue& cqueue, const std::vector<cl::event>& events);
         event unacquire(command_queue& cqueue, const std::vector<cl::event>& events);
+
+        event acquire(managed_command_queue& cqueue, const std::vector<cl::event>& events);
+        event unacquire(managed_command_queue& cqueue, const std::vector<cl::event>& events);
     };
 
     template<int N, typename T>

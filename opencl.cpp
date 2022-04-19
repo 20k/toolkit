@@ -94,6 +94,63 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
     }
 }
 
+namespace
+{
+bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
+{
+    ///do not need a memory barrier between two overlapping objects if and only if they're both read only
+    if((flag1 & CL_MEM_READ_ONLY) && (flag2 & CL_MEM_READ_ONLY))
+        return false;
+
+    return true;
+}
+
+bool requires_memory_barrier_sorted(const cl::access_storage& base, const cl::access_storage& theirs)
+{
+    for(auto& [mem, flags] : theirs.store)
+    {
+        auto it = base.store.find(mem);
+
+        if(it == base.store.end())
+            continue;
+
+        for(cl_mem_flags f : it->second)
+        {
+            for(cl_mem_flags g : flags)
+            {
+                if(requires_memory_barrier_raw(f, g))
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& managed, cl::access_storage& store)
+{
+    std::vector<cl::event> deps;
+
+    for(const auto& [evt, args, tag] : managed.event_history)
+    {
+        if(requires_memory_barrier_sorted(store, args))
+        {
+            deps.push_back(evt);
+        }
+    }
+
+    return deps;
+}
+
+std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& managed, cl::mem_object& obj)
+{
+    cl::access_storage store;
+    store.add(obj.native_mem_object.data);
+
+    return get_implicit_dependencies(managed, store);
+}
+}
+
 static
 cl_event* get_event_pointer(const std::vector<cl::event>& events)
 {
@@ -513,15 +570,6 @@ cl_mem_flags cl::get_flags(cl_mem in)
     return ret;
 }
 
-bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
-{
-    ///do not need a memory barrier between two overlapping objects if and only if they're both read only
-    if((flag1 & CL_MEM_READ_ONLY) && (flag2 & CL_MEM_READ_ONLY))
-        return false;
-
-    return true;
-}
-
 bool cl::requires_memory_barrier(cl_mem in1, cl_mem in2)
 {
     if(in1 == nullptr || in2 == nullptr)
@@ -546,28 +594,6 @@ void cl::access_storage::add(cl_mem in)
     auto vars = get_barrier_vars(in);
 
     store[vars.first].push_back(vars.second);
-}
-
-bool requires_memory_barrier_sorted(const cl::access_storage& base, const cl::access_storage& theirs)
-{
-    for(auto& [mem, flags] : theirs.store)
-    {
-        auto it = base.store.find(mem);
-
-        if(it == base.store.end())
-            continue;
-
-        for(cl_mem_flags f : it->second)
-        {
-            for(cl_mem_flags g : flags)
-            {
-                if(requires_memory_barrier_raw(f, g))
-                    return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 std::pair<cl_mem, cl_mem_flags> get_barrier_vars(cl_mem in)
@@ -1023,6 +1049,11 @@ cl::command_queue& cl::multi_command_queue::next()
 
 cl::managed_command_queue::managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count) : mqueue(ctx, props, queue_count){}
 
+std::vector<cl::event> cl::managed_command_queue::get_dependencies(cl::mem_object& obj)
+{
+    return get_implicit_dependencies(*this, obj);
+}
+
 void cl::managed_command_queue::begin_splice(cl::command_queue& cqueue)
 {
     mqueue.begin_splice(cqueue);
@@ -1035,7 +1066,7 @@ void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
     event_history.clear();
 }
 
-void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, cl::event& evt)
+void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, const cl::event& evt)
 {
     cl::access_storage store;
     store.add(obj.native_mem_object.data);
@@ -1057,25 +1088,7 @@ cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, 
         }
     }
 
-    std::vector<cl::event> prior_deps;
-
-    ///todo: make this not n^really bad
-    ///dechildify, then take the intersection
-    for(int i=0; i < (int)event_history.size(); i++)
-    {
-        const cl::event& evt = std::get<0>(event_history[i]);
-        const access_storage& args = std::get<1>(event_history[i]);
-        const std::string& tag = std::get<2>(event_history[i]);
-
-        //assert(cl::requires_memory_barrier(pack.memory_objects, args) == requires_memory_barrier_sorted(my_barrier_vars, their_vars));
-
-        if(requires_memory_barrier_sorted(pack.memory_objects, args))
-        {
-            prior_deps.push_back(evt);
-
-            //std::cout << "kname has dep " << kname << " on " << tag << std::endl;
-        }
-    }
+    std::vector<cl::event> prior_deps = get_implicit_dependencies(*this, pack.memory_objects);
 
     prior_deps.insert(prior_deps.end(), deps.begin(), deps.end());
 
@@ -1381,6 +1394,25 @@ cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue, const std::
 cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
 {
     return unacquire(cqueue, {});
+}
+
+cl::event cl::gl_rendertexture::acquire(cl::managed_command_queue& mqueue, const std::vector<cl::event>& events)
+{
+    return mqueue.add([&](cl::command_queue& cqueue, const std::vector<cl::event>& full)
+    {
+        return acquire(cqueue, full);
+    },
+    *this, events);
+}
+
+
+cl::event cl::gl_rendertexture::unacquire(cl::managed_command_queue& mqueue, const std::vector<cl::event>& events)
+{
+    return mqueue.add([&](cl::command_queue& cqueue, const std::vector<cl::event>& full)
+    {
+        return unacquire(cqueue, full);
+    },
+    *this, events);
 }
 
 void cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
