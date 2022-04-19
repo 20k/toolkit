@@ -721,23 +721,21 @@ cl::event cl::buffer::set_to_zero(cl::command_queue& write_on)
 {
     static int zero = 0;
 
-    cl::event evt;
-
-    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, (const void*)&zero, 1, 0, alloc_size, 0, nullptr, &evt.native_event.data);
-
-    if(val != CL_SUCCESS)
-    {
-        throw std::runtime_error("Could not set_to_zero");
-    }
-
-    return evt;
+    return fill(write_on, (const char*)&zero, 1, alloc_size);
 }
 
-cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size)
+cl::event cl::buffer::set_to_zero(cl::managed_command_queue& write_on)
+{
+    static int zero = 0;
+
+    return fill(write_on, (const char*)&zero, 1, alloc_size);
+}
+
+cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps)
 {
     cl::event evt;
 
-    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, 0, nullptr, &evt.native_event.data);
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, deps.size(), get_event_pointer(deps), &evt.native_event.data);
 
     if(val != CL_SUCCESS)
     {
@@ -745,6 +743,15 @@ cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, siz
     }
 
     return evt;
+}
+
+cl::event cl::buffer::fill(cl::managed_command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps)
+{
+    return write_on.add([&](cl::command_queue& cqueue, const std::vector<cl::event>& full)
+    {
+        return fill(cqueue, pattern, pattern_size, size, full);
+    },
+    *this, deps);
 }
 
 namespace

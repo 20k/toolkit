@@ -335,6 +335,7 @@ namespace cl
     };
 
     struct command_queue;
+    struct managed_command_queue;
 
     struct mem_object
     {
@@ -412,7 +413,10 @@ namespace cl
         }
 
         cl::event set_to_zero(command_queue& write_on);
-        cl::event fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size);
+        cl::event fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps = std::vector<cl::event>());
+
+        cl::event set_to_zero(managed_command_queue& write_on);
+        cl::event fill(managed_command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps = std::vector<cl::event>());
 
         template<typename T>
         cl::event fill(command_queue& write_on, const T& value)
