@@ -681,7 +681,7 @@ namespace cl
 
             cl::command_queue& exec_on = mqueue.next();
 
-            cl::event next = func(exec_on, events);
+            cl::event next = func(exec_on, evts);
 
             cl::access_storage store;
             store.add(obj.native_mem_object.data);
@@ -712,8 +712,8 @@ namespace cl
         event acquire(command_queue& cqueue, const std::vector<cl::event>& events);
         event unacquire(command_queue& cqueue, const std::vector<cl::event>& events);
 
-        event acquire(managed_command_queue& cqueue, const std::vector<cl::event>& events);
-        event unacquire(managed_command_queue& cqueue, const std::vector<cl::event>& events);
+        event acquire(managed_command_queue& cqueue, const std::vector<cl::event>& events = std::vector<cl::event>());
+        event unacquire(managed_command_queue& cqueue, const std::vector<cl::event>& events = std::vector<cl::event>());
     };
 
     template<int N, typename T>

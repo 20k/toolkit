@@ -1412,7 +1412,6 @@ cl::event cl::gl_rendertexture::acquire(cl::managed_command_queue& mqueue, const
     *this, events);
 }
 
-
 cl::event cl::gl_rendertexture::unacquire(cl::managed_command_queue& mqueue, const std::vector<cl::event>& events)
 {
     return mqueue.add([&](cl::command_queue& cqueue, const std::vector<cl::event>& full)
