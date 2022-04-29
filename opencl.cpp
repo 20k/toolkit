@@ -102,6 +102,9 @@ bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
     if((flag1 & CL_MEM_READ_ONLY) && (flag2 & CL_MEM_READ_ONLY))
         return false;
 
+    //if((flag1 & CL_MEM_WRITE_ONLY) && (flag2 & CL_MEM_WRITE_ONLY))
+    //    return false;
+
     return true;
 }
 
