@@ -671,6 +671,7 @@ namespace cl
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
 
         void flush();
+        void block();
 
         template<typename T>
         cl::event add(const T& func, cl::mem_object& obj, const std::vector<cl::event>& events)

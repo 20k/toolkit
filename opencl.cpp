@@ -1120,6 +1120,14 @@ void cl::managed_command_queue::flush()
     }
 }
 
+void cl::managed_command_queue::block()
+{
+    for(cl::command_queue& q : mqueue.queues)
+    {
+        q.block();
+    }
+}
+
 cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
 {
     cl::event ret;
