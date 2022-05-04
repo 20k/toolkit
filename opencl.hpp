@@ -221,6 +221,8 @@ namespace cl
             }
             else
             {
+                static_assert(std::is_trivially_copyable_v<T>);
+
                 auto* ptr = v.get();
                 push_arg(cl::build_from_args(std::move(v), ptr));
             }
