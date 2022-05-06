@@ -413,8 +413,14 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
 
 void debug_build_status(cl_program prog, cl_device_id selected_device)
 {
-    cl_build_status bstatus = 0;
-    clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+    cl_build_status bstatus = CL_BUILD_ERROR;
+    cl_int build_info_result = clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
+
+    if(build_info_result != CL_SUCCESS)
+    {
+        std::cout << "Error in clGetProgramBuildInfo " << build_info_result << std::endl;
+        return;
+    }
 
     if(bstatus == CL_SUCCESS)
         return;
@@ -470,7 +476,13 @@ void cl::program::build(context& ctx, const std::string& options)
         if(async_ctx->cancelled)
             return;
 
-        clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
+        cl_int build_err = clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
+
+        if(build_err != CL_SUCCESS)
+        {
+            std::cout << "Error in clBuildProgram " << build_err << std::endl;
+            throw std::runtime_error("Build Error " + std::to_string(build_err));
+        }
 
         if(async_ctx->cancelled)
             return;
@@ -530,7 +542,7 @@ void cl::program::ensure_built()
     }
 
 
-    cl_build_status status = 0;
+    cl_build_status status = CL_BUILD_ERROR;
     clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
 
     if(status != CL_SUCCESS)
