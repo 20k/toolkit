@@ -469,7 +469,7 @@ void cl::program::build(context& ctx, const std::string& options)
     cl_device_id selected = selected_device;
     std::shared_ptr<async_context> async_ctx = async;
 
-    std::thread([prog, selected, build_options, async_ctx]()
+    std::thread([prog, selected, build_options, async_ctx, options]()
     {
         async_setter sett(async_ctx);
 
@@ -478,8 +478,13 @@ void cl::program::build(context& ctx, const std::string& options)
 
         cl_int build_err = clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
 
-        if(build_err != CL_SUCCESS)
+        if(build_err != CL_SUCCESS && build_err != CL_BUILD_PROGRAM_FAILURE)
         {
+            if(build_err == -66)
+            {
+                std::cout << "Failed to compile due to build options " << options << std::endl;
+            }
+
             std::cout << "Error in clBuildProgram " << build_err << std::endl;
             throw std::runtime_error("Build Error " + std::to_string(build_err));
         }
