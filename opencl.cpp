@@ -496,6 +496,11 @@ void cl::program::build(context& ctx, const std::string& options)
 
         cl_kernels.resize(num);
 
+        if(num == 0)
+        {
+            printf("Warning, 0 kernels built\n");
+        }
+
         std::map<std::string, cl::kernel>& which = async_ctx->built_kernels;
 
         for(cl_kernel k : cl_kernels)
