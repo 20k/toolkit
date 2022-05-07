@@ -463,7 +463,7 @@ struct async_setter
 
 void cl::program::build(context& ctx, const std::string& options)
 {
-    std::string build_options = "-cl-no-signed-zeros -cl-single-precision-constant " + options;
+    std::string build_options = "-cl-single-precision-constant " + options;
 
     auto prog = native_program;
     cl_device_id selected = selected_device;
