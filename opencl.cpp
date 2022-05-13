@@ -216,7 +216,7 @@ cl::kernel::kernel(cl::program& p, const std::string& kname)
     if(err != CL_SUCCESS)
     {
         std::cout << "Invalid Kernel Name " << kname << " err " << err << std::endl;
-        throw std::runtime_error("Bad kernel");
+        throw std::runtime_error("Bad kernel " + kname);
     }
     else
     {
