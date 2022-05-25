@@ -15,6 +15,7 @@
 #include <string_view>
 #include <atomic>
 #include <optional>
+#include <functional>
 
 namespace cl
 {
