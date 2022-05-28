@@ -430,6 +430,14 @@ namespace cl
         }
 
         template<typename T>
+        cl::event fill(managed_command_queue& write_on, const T& value)
+        {
+            assert((alloc_size % sizeof(T)) == 0);
+
+            return fill(write_on, (void*)&value, sizeof(T), alloc_size);
+        }
+
+        template<typename T>
         std::vector<T> read(command_queue& read_on)
         {
             std::vector<T> ret;
