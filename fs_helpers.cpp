@@ -131,6 +131,15 @@ std::optional<std::string> file::request::read(const std::string& file, file::mo
 
     emscripten_fetch_close(fetch);
 
+    if(m == file::mode::TEXT && result.has_value())
+    {
+        std::string::size_type pos = 0;
+        while ((pos = result.value().find("\r\n", pos)) != std::string::npos)
+        {
+            result.value().replace(pos, 2, "\n");
+        }
+    }
+
     return result;
     #endif
 }
