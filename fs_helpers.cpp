@@ -62,15 +62,11 @@ file::manual_fs_sync::~manual_fs_sync()
     sync_writes();
 }
 
-std::string file::read(const std::string& file, file::mode::type m)
+std::string read_impl(const std::string& file, file::mode::type m)
 {
     const char* fmode = (m == file::mode::BINARY) ? "rb" : "r";
 
-    #ifndef __EMSCRIPTEN__
     FILE* f = fopen(file.c_str(), fmode);
-    #else
-    FILE* f = fopen(("web/" + file).c_str(), fmode);
-    #endif
 
     if(f == nullptr)
         return "";
@@ -93,6 +89,22 @@ std::string file::read(const std::string& file, file::mode::type m)
     fclose(f);
 
     return buffer;
+}
+
+std::string file::read(const std::string& file, file::mode::type m)
+{
+    const char* fmode = (m == file::mode::BINARY) ? "rb" : "r";
+
+    #ifndef __EMSCRIPTEN__
+    return read_impl(file, m);
+    #else
+    return read_impl("web/" + file, m);
+    #endif
+}
+
+std::string file::memfs::read(const std::string& file, file::mode::type m)
+{
+    return read_impl(file, m);
 }
 
 void file::write(const std::string& file, const std::string& data, file::mode::type m)
@@ -253,6 +265,13 @@ bool file::exists(const std::string& name)
     return f.good();
 }
 
+bool file::memfs::exists(const std::string& name)
+{
+    std::ifstream f(name.c_str());
+
+    return f.good();
+}
+
 void file::rename(const std::string& from, const std::string& to)
 {
     #ifndef __EMSCRIPTEN__
@@ -283,6 +302,19 @@ void file::mkdir(const std::string& name)
     #endif // __WIN32__
     #else
     ::mkdir(("web/" + name).c_str(), 0777);
+    #endif
+}
+
+void file::memfs::mkdir(const std::string& name)
+{
+    #ifndef __EMSCRIPTEN__
+    #ifdef __WIN32__
+    ::_mkdir(name.c_str());
+    #else
+    ::mkdir(name.c_str(), 0777);
+    #endif // __WIN32__
+    #else
+    ::mkdir(name.c_str(), 0777);
     #endif
 }
 

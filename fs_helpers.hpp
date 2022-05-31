@@ -31,6 +31,13 @@ namespace file
 
     void mkdir(const std::string& name);
 
+    namespace memfs
+    {
+        std::string read(const std::string& file, mode::type m);
+        bool exists(const std::string& name);
+        void mkdir(const std::string& name);
+    }
+
     #ifdef __EMSCRIPTEN__
     // EMSCRIPTEN ONLY OBVIOUSLY
     void download(const std::string& name, const std::string& data);
