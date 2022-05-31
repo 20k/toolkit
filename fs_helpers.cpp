@@ -8,6 +8,7 @@
 #include <fstream>
 #include <atomic>
 #include <stdlib.h>
+#include <optional>
 
 #ifdef __WIN32__
 #define WIN32_LEAN_AND_MEAN
@@ -22,6 +23,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/fetch.h>
 #endif // __EMSCRIPTEN__
 
 #ifdef __EMSCRIPTEN__
@@ -93,8 +95,6 @@ std::string read_impl(const std::string& file, file::mode::type m)
 
 std::string file::read(const std::string& file, file::mode::type m)
 {
-    const char* fmode = (m == file::mode::BINARY) ? "rb" : "r";
-
     #ifndef __EMSCRIPTEN__
     return read_impl(file, m);
     #else
@@ -102,9 +102,37 @@ std::string file::read(const std::string& file, file::mode::type m)
     #endif
 }
 
-std::string file::memfs::read(const std::string& file, file::mode::type m)
+std::optional<std::string> file::request::read(const std::string& file, file::mode::type m)
 {
-    return read_impl(file, m);
+    #ifndef __EMSCRIPTEN__
+    if(!file::exists(file))
+        return std::nullopt;
+
+    return file::read(file, m);
+    #else
+    emscripten_fetch_attr_t attr;
+    emscripten_fetch_attr_init(&attr);
+    strcpy(attr.requestMethod, "GET");
+    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_SYNCHRONOUS;
+    emscripten_fetch_t *fetch = emscripten_fetch(&attr, file.c_str()); // Blocks here until the operation is complete.
+
+    std::optional<std::string> result;
+
+    if(fetch->status == 200)
+    {
+        printf("Finished downloading %llu bytes from URL %s.\n", fetch->numBytes, fetch->url);
+
+        result.emplace(fetch->data, fetch->data + fetch->numBytes);
+    }
+    else
+    {
+        //printf("Downloading %s failed, HTTP failure status code: %d.\n", fetch->url, fetch->status);
+    }
+
+    emscripten_fetch_close(fetch);
+
+    return result;
+    #endif
 }
 
 void file::write(const std::string& file, const std::string& data, file::mode::type m)
@@ -265,13 +293,6 @@ bool file::exists(const std::string& name)
     return f.good();
 }
 
-bool file::memfs::exists(const std::string& name)
-{
-    std::ifstream f(name.c_str());
-
-    return f.good();
-}
-
 void file::rename(const std::string& from, const std::string& to)
 {
     #ifndef __EMSCRIPTEN__
@@ -302,19 +323,6 @@ void file::mkdir(const std::string& name)
     #endif // __WIN32__
     #else
     ::mkdir(("web/" + name).c_str(), 0777);
-    #endif
-}
-
-void file::memfs::mkdir(const std::string& name)
-{
-    #ifndef __EMSCRIPTEN__
-    #ifdef __WIN32__
-    ::_mkdir(name.c_str());
-    #else
-    ::mkdir(name.c_str(), 0777);
-    #endif // __WIN32__
-    #else
-    ::mkdir(name.c_str(), 0777);
     #endif
 }
 
