@@ -9,6 +9,8 @@
 #include <iostream>
 #include <toolkit/fs_helpers.hpp>
 #include "render_window_glfw.hpp"
+#include "clipboard.hpp"
+#include <functional>
 
 #ifdef USE_IMTUI
 #include <imtui/imtui.h>
@@ -111,8 +113,43 @@ EM_JS(void, drag_drop_init, (),
     elem.addEventListener("drop", drop, false);
 
     console.log("registered");
+
 });
 #endif // __EMSCRIPTEN__
+
+std::function<void(void*, const char*)> old_set_clipboard;
+std::function<const char*(void*)> old_get_clipboard;
+
+void set_clipboard_free(void* user_data, const char* text)
+{
+    #ifndef __EMSCRIPTEN__
+    old_set_clipboard(user_data, text);
+    #else
+    clipboard::set(text);
+    #endif
+}
+
+const char* get_clipboard_free(void* user_data)
+{
+    #ifndef __EMSCRIPTEN__
+    old_get_clipboard(user_data);
+    #else
+    static thread_local std::string clip_buffer;
+
+    clip_buffer = clipboard::get();
+
+    return clip_buffer.c_str();
+    #endif
+}
+
+void init_clipboard()
+{
+    old_set_clipboard = ImGui::GetIO().SetClipboardTextFn;
+    old_get_clipboard = ImGui::GetIO().GetClipboardTextFn;
+
+    ImGui::GetIO().GetClipboardTextFn = &get_clipboard_free;
+    ImGui::GetIO().SetClipboardTextFn = &set_clipboard_free;
+}
 
 void emscripten_drag_drop::init()
 {
@@ -339,6 +376,8 @@ render_window::render_window(render_settings sett, generic_backend* _backend)
     ImGui::GetIO().IniFilename = "web/imgui.ini";
 
     //drag_drop_init();
+
+    init_clipboard();
     #endif // __EMSCRIPTEN__
 }
 
@@ -377,6 +416,8 @@ render_window::render_window(render_settings sett, const std::string& window_tit
     ImGui::GetIO().IniFilename = "web/imgui.ini";
 
     //drag_drop_init();
+
+    init_clipboard();
     #endif // __EMSCRIPTEN__
     #else
     assert(false);
