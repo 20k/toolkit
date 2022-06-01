@@ -44,6 +44,8 @@ namespace
 void sync_writes()
 {
     #ifdef __EMSCRIPTEN__
+    syncs_dirty = true;
+
     if(syncs == 0 && syncs_dirty)
     {
         syncer();
