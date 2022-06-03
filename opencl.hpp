@@ -513,6 +513,15 @@ namespace cl
         }
     };
 
+    namespace image_flags
+    {
+        enum type
+        {
+            NONE,
+            ARRAY,
+        };
+    }
+
     struct image : image_base
     {
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -521,10 +530,10 @@ namespace cl
 
         image(cl::context& ctx);
 
-        void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, const cl_image_format& format);
+        void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, const cl_image_format& format, image_flags::type t = image_flags::NONE);
 
         template<int N>
-        void alloc(const vec<N, int>& in_dims, const cl_image_format& format)
+        void alloc(const vec<N, int>& in_dims, const cl_image_format& format, image_flags::type t = image_flags::NONE)
         {
             //assert(in_dims.size() == N);
 
@@ -535,10 +544,10 @@ namespace cl
             for(int i=0; i < N; i++)
                 storage[i] = in_dims.v[i];
 
-            return alloc_impl(N, storage, format);
+            return alloc_impl(N, storage, format, t);
         }
 
-        void alloc(std::initializer_list<int> init, const cl_image_format& format)
+        void alloc(std::initializer_list<int> init, const cl_image_format& format, image_flags::type t = image_flags::NONE)
         {
             assert(init.size() <= 3 && init.size() > 0);
 
@@ -552,7 +561,7 @@ namespace cl
                 idx++;
             }
 
-            return alloc_impl(init.size(), storage, format);
+            return alloc_impl(init.size(), storage, format, t);
         }
 
         void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region);

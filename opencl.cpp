@@ -839,32 +839,57 @@ cl::image::image(cl::context& ctx)
     native_context = ctx.native_context;
 }
 
-void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const cl_image_format& format)
+void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const cl_image_format& format, cl::image_flags::type t)
 {
     cl_image_desc desc = {0};
     desc.image_width = 1;
     desc.image_height = 1;
     desc.image_depth = 1;
 
-    if(dims == 1)
-    {
-        desc.image_type = CL_MEM_OBJECT_IMAGE1D;
-        desc.image_width = _sizes[0];
-    }
+    bool is_arr = t == cl::image_flags::ARRAY;
 
-    if(dims == 2)
+    if(!is_arr)
     {
-        desc.image_type = CL_MEM_OBJECT_IMAGE2D;
-        desc.image_width = _sizes[0];
-        desc.image_height = _sizes[1];
-    }
+        if(dims == 1)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE1D;
+            desc.image_width = _sizes[0];
+        }
 
-    if(dims == 3)
+        if(dims == 2)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+            desc.image_width = _sizes[0];
+            desc.image_height = _sizes[1];
+        }
+
+        if(dims == 3)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE3D;
+            desc.image_width = _sizes[0];
+            desc.image_height = _sizes[1];
+            desc.image_depth = _sizes[2];
+        }
+    }
+    else
     {
-        desc.image_type = CL_MEM_OBJECT_IMAGE3D;
-        desc.image_width = _sizes[0];
-        desc.image_height = _sizes[1];
-        desc.image_depth = _sizes[2];
+        assert(dims != 1);
+        assert(dims != 4); ///cannot have array of 3d objects
+
+        if(dims == 2)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE1D_ARRAY;
+            desc.image_width = _sizes[0];
+            desc.image_array_size = _sizes[1];
+        }
+
+        if(dims == 3)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE2D_ARRAY;
+            desc.image_width = _sizes[0];
+            desc.image_height = _sizes[1];
+            desc.image_array_size = _sizes[2];
+        }
     }
 
     native_mem_object.release();
