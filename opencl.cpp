@@ -899,7 +899,7 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
 
     if(err != CL_SUCCESS)
     {
-        throw std::runtime_error("Could not clCreateImage");
+        throw std::runtime_error("Could not clCreateImage " + std::to_string(err));
     }
 
     dimensions = dims;
