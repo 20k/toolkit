@@ -16,6 +16,7 @@
 #include <atomic>
 #include <optional>
 #include <functional>
+#include <span>
 
 namespace cl
 {
@@ -388,10 +389,16 @@ namespace cl
         template<typename T>
         void write(command_queue& write_on, const std::vector<T>& data)
         {
+            return write(write_on, std::span{data});
+        }
+
+        template<typename T>
+        void write(command_queue& write_on, std::span<T> data)
+        {
             if(data.size() == 0)
                 return;
 
-            write(write_on, (const char*)&data[0], data.size() * sizeof(T));
+            write(write_on, (const char*)data.data(), data.size() * sizeof(T));
         }
 
         event write_async(command_queue& write_on, const char* ptr, int64_t bytes);
@@ -643,7 +650,7 @@ namespace cl
 
         event enqueue_marker(const std::vector<event>& deps);
 
-        event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
+        event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
         void block();
