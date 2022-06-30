@@ -305,6 +305,15 @@ cl::context::context()
         CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
         0
     };
+    #elif defined(__APPLE__)
+    CGLContextObj cgl_context = CGLGetCurrentContext();
+    CGLShareGroupObj cgl_share_group = CGLGetShareGroup(cgl_current_context);
+
+    cl_context_properties properties[] = {
+        CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
+        (cl_context_properties) cgl_share_group,
+        0
+    };
     #else
     cl_context_properties props[] =
     {
