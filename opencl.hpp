@@ -384,6 +384,7 @@ namespace cl
         buffer(cl::context& ctx);
 
         void alloc(int64_t bytes);
+        void write(command_queue& write_on, const char* ptr, int64_t bytes, int64_t offset);
         void write(command_queue& write_on, const char* ptr, int64_t bytes);
 
         template<typename T>

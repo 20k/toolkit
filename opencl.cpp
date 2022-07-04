@@ -664,16 +664,21 @@ void cl::buffer::alloc(int64_t bytes)
     native_mem_object.consume(found);
 }
 
-void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes, int64_t offset)
 {
-    assert(bytes <= alloc_size);
+    assert((bytes + offset) <= alloc_size);
 
-    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_TRUE, 0, bytes, ptr, 0, nullptr, nullptr);
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_TRUE, offset, bytes, ptr, 0, nullptr, nullptr);
 
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not write");
     }
+}
+
+void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+{
+    write(write_on, ptr, bytes, 0);
 }
 
 void event_memory_free(cl_event event, cl_int event_command_status, void* user_data)
