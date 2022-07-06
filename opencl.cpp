@@ -535,8 +535,6 @@ void cl::program::build(context& ctx, const std::string& options)
 
             k1.name.resize(strlen(k1.name.c_str()));
 
-            std::cout << "Registered " << k1.name << std::endl;
-
             which[k1.name] = k1;
         }
     }).detach();
@@ -554,7 +552,6 @@ void cl::program::ensure_built()
         printf("Program not built\n");
         return;
     }
-
 
     cl_build_status status = CL_BUILD_ERROR;
     clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
