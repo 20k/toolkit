@@ -159,8 +159,6 @@ glfw_render_context::glfw_render_context(const render_settings& lsett, const std
 
     ImGui::CreateContext(&atlas);
 
-    printf("ImGui create context\n");
-
     ImGuiIO& io = ImGui::GetIO();
 
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -193,8 +191,6 @@ glfw_render_context::glfw_render_context(const render_settings& lsett, const std
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-
-    printf("ImGui finished creation\n");
 }
 
 glfw_render_context::~glfw_render_context()
