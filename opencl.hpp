@@ -780,7 +780,7 @@ namespace cl
         }
     };
 
-    void copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest);
+    event copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest);
 
     template<typename T, typename U>
     void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec3i origin, vec3i region)

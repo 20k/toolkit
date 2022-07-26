@@ -1490,18 +1490,22 @@ cl::event cl::gl_rendertexture::unacquire(cl::managed_command_queue& mqueue, con
     *this, events);
 }
 
-void cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
+cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
 {
+    cl::event evt;
+
     assert(source.alloc_size == dest.alloc_size);
 
     size_t amount = std::min(source.alloc_size, dest.alloc_size);
 
-    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);
+    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, 0, nullptr, &evt.native_event.data);
 
     if(err != CL_SUCCESS)
     {
         throw std::runtime_error("Could not copy buffers");
     }
+
+    return evt;
 }
 
 std::string cl::get_extensions(context& ctx)
