@@ -651,6 +651,7 @@ namespace cl
 
         event enqueue_marker(const std::vector<event>& deps);
 
+        ///apparently past me was not very bright, and used an int max work size here
         event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
