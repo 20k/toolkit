@@ -132,7 +132,7 @@ void set_clipboard_free(void* user_data, const char* text)
 const char* get_clipboard_free(void* user_data)
 {
     #ifndef __EMSCRIPTEN__
-    old_get_clipboard(user_data);
+    return old_get_clipboard(user_data);
     #else
     static thread_local std::string clip_buffer;
 
@@ -313,7 +313,7 @@ imtui_backend::~imtui_backend()
 
 void imtui_backend::poll(double maximum_sleep_s)
 {
-    ImTui_ImplNcurses_NewFrame(*screen);
+    ImTui_ImplNcurses_NewFrame();
     ImTui_ImplText_NewFrame();
 
     ImGui::GetIO().DeltaTime = clk.restart();
@@ -325,8 +325,8 @@ void imtui_backend::display()
 {
     ImGui::Render();
 
-    ImTui_ImplText_RenderDrawData(ImGui::GetDrawData(), *screen);
-    ImTui_ImplNcurses_DrawScreen(*screen);
+    ImTui_ImplText_RenderDrawData(ImGui::GetDrawData(), screen);
+    ImTui_ImplNcurses_DrawScreen(true);
 }
 
 bool imtui_backend::should_close()
@@ -453,7 +453,9 @@ void render_window::set_srgb(bool enabled)
 
     settings.is_srgb = enabled;
 
+    #ifndef USE_IMTUI
     ImGui::SetStyleLinearColor(settings.is_srgb);
+    #endif // USE_IMTUI
 }
 
 void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
@@ -463,6 +465,7 @@ void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
 }
 
+#ifndef USE_IMTUI
 std::vector<frostable> render_window::get_frostables()
 {
     ImGuiContext& g = *GImGui;
@@ -500,6 +503,7 @@ std::vector<frostable> render_window::get_frostables()
 
     return frosts;
 }
+#endif // USE_IMTUI
 
 void render_window::render(const std::vector<vertex>& vertices, texture* tex)
 {
