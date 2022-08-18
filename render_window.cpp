@@ -264,8 +264,6 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 #ifdef USE_IMTUI
 imtui_backend::imtui_backend(const render_settings& sett, const std::string& window_title)
 {
-    screen = new ImTui::TScreen;
-
     ImGui::CreateContext();
 
     printf("ImGui create context\n");
@@ -300,7 +298,7 @@ imtui_backend::imtui_backend(const render_settings& sett, const std::string& win
     io.Fonts->AddFontDefault();
     /*ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1)*/
 
-    ImTui_ImplNcurses_Init(true);
+    screen = ImTui_ImplNcurses_Init(true);
     ImTui_ImplText_Init();
 }
 
@@ -316,7 +314,7 @@ void imtui_backend::poll(double maximum_sleep_s)
     ImTui_ImplNcurses_NewFrame();
     ImTui_ImplText_NewFrame();
 
-    ImGui::GetIO().DeltaTime = clk.restart();
+    //ImGui::GetIO().DeltaTime = clk.restart();
 
     ImGui::NewFrame();
 }
@@ -326,7 +324,7 @@ void imtui_backend::display()
     ImGui::Render();
 
     ImTui_ImplText_RenderDrawData(ImGui::GetDrawData(), screen);
-    ImTui_ImplNcurses_DrawScreen(true);
+    ImTui_ImplNcurses_DrawScreen();
 }
 
 bool imtui_backend::should_close()
