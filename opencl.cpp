@@ -364,6 +364,11 @@ cl::kernel cl::context::fetch_kernel(std::string_view name)
     throw std::runtime_error("no such kernel in context");
 }
 
+cl::program::program(context& ctx)
+{
+    selected_device = ctx.selected_device;
+}
+
 cl::program::program(context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
 {
 

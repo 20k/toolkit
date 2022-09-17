@@ -294,6 +294,7 @@ namespace cl
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
         std::shared_ptr<async_context> async;
 
+        program(context& ctx);
         program(context& ctx, const std::string& data, bool is_file = true);
         program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
 
