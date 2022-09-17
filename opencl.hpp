@@ -16,6 +16,7 @@
 #include <atomic>
 #include <optional>
 #include <functional>
+#include <span>
 
 namespace cl
 {
@@ -384,15 +385,22 @@ namespace cl
         buffer(cl::context& ctx);
 
         void alloc(int64_t bytes);
+        void write(command_queue& write_on, const char* ptr, int64_t bytes, int64_t offset);
         void write(command_queue& write_on, const char* ptr, int64_t bytes);
 
         template<typename T>
         void write(command_queue& write_on, const std::vector<T>& data)
         {
+            return write(write_on, std::span{data});
+        }
+
+        template<typename T>
+        void write(command_queue& write_on, std::span<T> data)
+        {
             if(data.size() == 0)
                 return;
 
-            write(write_on, (const char*)&data[0], data.size() * sizeof(T));
+            write(write_on, (const char*)data.data(), data.size() * sizeof(T));
         }
 
         event write_async(command_queue& write_on, const char* ptr, int64_t bytes);
@@ -514,6 +522,15 @@ namespace cl
         }
     };
 
+    namespace image_flags
+    {
+        enum type
+        {
+            NONE,
+            ARRAY,
+        };
+    }
+
     struct image : image_base
     {
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -522,10 +539,10 @@ namespace cl
 
         image(cl::context& ctx);
 
-        void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, const cl_image_format& format);
+        void alloc_impl(int dims, const std::array<int64_t, 3>& sizes, const cl_image_format& format, image_flags::type t = image_flags::NONE);
 
         template<int N>
-        void alloc(const vec<N, int>& in_dims, const cl_image_format& format)
+        void alloc(const vec<N, int>& in_dims, const cl_image_format& format, image_flags::type t = image_flags::NONE)
         {
             //assert(in_dims.size() == N);
 
@@ -536,10 +553,10 @@ namespace cl
             for(int i=0; i < N; i++)
                 storage[i] = in_dims.v[i];
 
-            return alloc_impl(N, storage, format);
+            return alloc_impl(N, storage, format, t);
         }
 
-        void alloc(std::initializer_list<int> init, const cl_image_format& format)
+        void alloc(std::initializer_list<int> init, const cl_image_format& format, image_flags::type t = image_flags::NONE)
         {
             assert(init.size() <= 3 && init.size() > 0);
 
@@ -553,7 +570,7 @@ namespace cl
                 idx++;
             }
 
-            return alloc_impl(init.size(), storage, format);
+            return alloc_impl(init.size(), storage, format, t);
         }
 
         void write_impl(command_queue& write_on, const char* ptr, const vec<3, size_t>& origin, const vec<3, size_t>& region);
@@ -635,7 +652,8 @@ namespace cl
 
         event enqueue_marker(const std::vector<event>& deps);
 
-        event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
+        ///apparently past me was not very bright, and used an int max work size here
+        event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
         void block();
@@ -764,7 +782,7 @@ namespace cl
         }
     };
 
-    void copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest);
+    event copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest);
 
     template<typename T, typename U>
     void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec3i origin, vec3i region)

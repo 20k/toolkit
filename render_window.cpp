@@ -9,6 +9,8 @@
 #include <iostream>
 #include <toolkit/fs_helpers.hpp>
 #include "render_window_glfw.hpp"
+#include "clipboard.hpp"
+#include <functional>
 
 #ifdef USE_IMTUI
 #include <imtui/imtui.h>
@@ -111,8 +113,43 @@ EM_JS(void, drag_drop_init, (),
     elem.addEventListener("drop", drop, false);
 
     console.log("registered");
+
 });
 #endif // __EMSCRIPTEN__
+
+std::function<void(void*, const char*)> old_set_clipboard;
+std::function<const char*(void*)> old_get_clipboard;
+
+void set_clipboard_free(void* user_data, const char* text)
+{
+    #ifndef __EMSCRIPTEN__
+    old_set_clipboard(user_data, text);
+    #else
+    clipboard::set(text);
+    #endif
+}
+
+const char* get_clipboard_free(void* user_data)
+{
+    #ifndef __EMSCRIPTEN__
+    return old_get_clipboard(user_data);
+    #else
+    static thread_local std::string clip_buffer;
+
+    clip_buffer = clipboard::get();
+
+    return clip_buffer.c_str();
+    #endif
+}
+
+void init_clipboard()
+{
+    old_set_clipboard = ImGui::GetIO().SetClipboardTextFn;
+    old_get_clipboard = ImGui::GetIO().GetClipboardTextFn;
+
+    ImGui::GetIO().GetClipboardTextFn = &get_clipboard_free;
+    ImGui::GetIO().SetClipboardTextFn = &set_clipboard_free;
+}
 
 void emscripten_drag_drop::init()
 {
@@ -227,8 +264,6 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
 #ifdef USE_IMTUI
 imtui_backend::imtui_backend(const render_settings& sett, const std::string& window_title)
 {
-    screen = new ImTui::TScreen;
-
     ImGui::CreateContext();
 
     printf("ImGui create context\n");
@@ -263,7 +298,7 @@ imtui_backend::imtui_backend(const render_settings& sett, const std::string& win
     io.Fonts->AddFontDefault();
     /*ImGuiFreeType::BuildFontAtlas(&atlas, 0, 1)*/
 
-    ImTui_ImplNcurses_Init(true);
+    screen = ImTui_ImplNcurses_Init(true);
     ImTui_ImplText_Init();
 }
 
@@ -276,10 +311,10 @@ imtui_backend::~imtui_backend()
 
 void imtui_backend::poll(double maximum_sleep_s)
 {
-    ImTui_ImplNcurses_NewFrame(*screen);
+    ImTui_ImplNcurses_NewFrame();
     ImTui_ImplText_NewFrame();
 
-    ImGui::GetIO().DeltaTime = clk.restart();
+    //ImGui::GetIO().DeltaTime = clk.restart();
 
     ImGui::NewFrame();
 }
@@ -288,8 +323,8 @@ void imtui_backend::display()
 {
     ImGui::Render();
 
-    ImTui_ImplText_RenderDrawData(ImGui::GetDrawData(), *screen);
-    ImTui_ImplNcurses_DrawScreen(*screen);
+    ImTui_ImplText_RenderDrawData(ImGui::GetDrawData(), screen);
+    ImTui_ImplNcurses_DrawScreen();
 }
 
 bool imtui_backend::should_close()
@@ -339,6 +374,8 @@ render_window::render_window(render_settings sett, generic_backend* _backend)
     ImGui::GetIO().IniFilename = "web/imgui.ini";
 
     //drag_drop_init();
+
+    init_clipboard();
     #endif // __EMSCRIPTEN__
 }
 
@@ -377,6 +414,8 @@ render_window::render_window(render_settings sett, const std::string& window_tit
     ImGui::GetIO().IniFilename = "web/imgui.ini";
 
     //drag_drop_init();
+
+    init_clipboard();
     #endif // __EMSCRIPTEN__
     #else
     assert(false);
@@ -412,7 +451,9 @@ void render_window::set_srgb(bool enabled)
 
     settings.is_srgb = enabled;
 
+    #ifndef USE_IMTUI
     ImGui::SetStyleLinearColor(settings.is_srgb);
+    #endif // USE_IMTUI
 }
 
 void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
@@ -422,6 +463,7 @@ void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
 }
 
+#ifndef USE_IMTUI
 std::vector<frostable> render_window::get_frostables()
 {
     ImGuiContext& g = *GImGui;
@@ -459,6 +501,7 @@ std::vector<frostable> render_window::get_frostables()
 
     return frosts;
 }
+#endif // USE_IMTUI
 
 void render_window::render(const std::vector<vertex>& vertices, texture* tex)
 {

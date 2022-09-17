@@ -305,6 +305,15 @@ cl::context::context()
         CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
         0
     };
+    #elif defined(__APPLE__)
+    CGLContextObj cgl_context = CGLGetCurrentContext();
+    CGLShareGroupObj cgl_share_group = CGLGetShareGroup(cgl_current_context);
+
+    cl_context_properties properties[] = {
+        CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
+        (cl_context_properties) cgl_share_group,
+        0
+    };
     #else
     cl_context_properties props[] =
     {
@@ -531,8 +540,6 @@ void cl::program::build(context& ctx, const std::string& options)
 
             k1.name.resize(strlen(k1.name.c_str()));
 
-            std::cout << "Registered " << k1.name << std::endl;
-
             which[k1.name] = k1;
         }
     }).detach();
@@ -550,7 +557,6 @@ void cl::program::ensure_built()
         printf("Program not built\n");
         return;
     }
-
 
     cl_build_status status = CL_BUILD_ERROR;
     clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
@@ -660,16 +666,21 @@ void cl::buffer::alloc(int64_t bytes)
     native_mem_object.consume(found);
 }
 
-void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes, int64_t offset)
 {
-    assert(bytes <= alloc_size);
+    assert((bytes + offset) <= alloc_size);
 
-    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_TRUE, 0, bytes, ptr, 0, nullptr, nullptr);
+    cl_int val = clEnqueueWriteBuffer(write_on.native_command_queue.data, native_mem_object.data, CL_TRUE, offset, bytes, ptr, 0, nullptr, nullptr);
 
     if(val != CL_SUCCESS)
     {
         throw std::runtime_error("Could not write");
     }
+}
+
+void cl::buffer::write(cl::command_queue& write_on, const char* ptr, int64_t bytes)
+{
+    write(write_on, ptr, bytes, 0);
 }
 
 void event_memory_free(cl_event event, cl_int event_command_status, void* user_data)
@@ -844,32 +855,57 @@ cl::image::image(cl::context& ctx)
     native_context = ctx.native_context;
 }
 
-void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const cl_image_format& format)
+void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const cl_image_format& format, cl::image_flags::type t)
 {
     cl_image_desc desc = {0};
     desc.image_width = 1;
     desc.image_height = 1;
     desc.image_depth = 1;
 
-    if(dims == 1)
-    {
-        desc.image_type = CL_MEM_OBJECT_IMAGE1D;
-        desc.image_width = _sizes[0];
-    }
+    bool is_arr = t == cl::image_flags::ARRAY;
 
-    if(dims == 2)
+    if(!is_arr)
     {
-        desc.image_type = CL_MEM_OBJECT_IMAGE2D;
-        desc.image_width = _sizes[0];
-        desc.image_height = _sizes[1];
-    }
+        if(dims == 1)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE1D;
+            desc.image_width = _sizes[0];
+        }
 
-    if(dims == 3)
+        if(dims == 2)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+            desc.image_width = _sizes[0];
+            desc.image_height = _sizes[1];
+        }
+
+        if(dims == 3)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE3D;
+            desc.image_width = _sizes[0];
+            desc.image_height = _sizes[1];
+            desc.image_depth = _sizes[2];
+        }
+    }
+    else
     {
-        desc.image_type = CL_MEM_OBJECT_IMAGE3D;
-        desc.image_width = _sizes[0];
-        desc.image_height = _sizes[1];
-        desc.image_depth = _sizes[2];
+        assert(dims != 1);
+        assert(dims != 4); ///cannot have array of 3d objects
+
+        if(dims == 2)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE1D_ARRAY;
+            desc.image_width = _sizes[0];
+            desc.image_array_size = _sizes[1];
+        }
+
+        if(dims == 3)
+        {
+            desc.image_type = CL_MEM_OBJECT_IMAGE2D_ARRAY;
+            desc.image_width = _sizes[0];
+            desc.image_height = _sizes[1];
+            desc.image_array_size = _sizes[2];
+        }
     }
 
     native_mem_object.release();
@@ -879,7 +915,7 @@ void cl::image::alloc_impl(int dims, const std::array<int64_t, 3>& _sizes, const
 
     if(err != CL_SUCCESS)
     {
-        throw std::runtime_error("Could not clCreateImage");
+        throw std::runtime_error("Could not clCreateImage " + std::to_string(err));
     }
 
     dimensions = dims;
@@ -1459,18 +1495,22 @@ cl::event cl::gl_rendertexture::unacquire(cl::managed_command_queue& mqueue, con
     *this, events);
 }
 
-void cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
+cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
 {
+    cl::event evt;
+
     assert(source.alloc_size == dest.alloc_size);
 
     size_t amount = std::min(source.alloc_size, dest.alloc_size);
 
-    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, 0, nullptr, nullptr);
+    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, 0, nullptr, &evt.native_event.data);
 
     if(err != CL_SUCCESS)
     {
         throw std::runtime_error("Could not copy buffers");
     }
+
+    return evt;
 }
 
 std::string cl::get_extensions(context& ctx)

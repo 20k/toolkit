@@ -8,6 +8,7 @@
 #include <fstream>
 #include <atomic>
 #include <stdlib.h>
+#include <optional>
 
 #ifdef __WIN32__
 #define WIN32_LEAN_AND_MEAN
@@ -22,6 +23,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/fetch.h>
 #endif // __EMSCRIPTEN__
 
 #ifdef __EMSCRIPTEN__
@@ -42,6 +44,8 @@ namespace
 void sync_writes()
 {
     #ifdef __EMSCRIPTEN__
+    syncs_dirty = true;
+
     if(syncs == 0 && syncs_dirty)
     {
         syncer();
@@ -62,15 +66,11 @@ file::manual_fs_sync::~manual_fs_sync()
     sync_writes();
 }
 
-std::string file::read(const std::string& file, file::mode::type m)
+std::string read_impl(const std::string& file, file::mode::type m)
 {
     const char* fmode = (m == file::mode::BINARY) ? "rb" : "r";
 
-    #ifndef __EMSCRIPTEN__
     FILE* f = fopen(file.c_str(), fmode);
-    #else
-    FILE* f = fopen(("web/" + file).c_str(), fmode);
-    #endif
 
     if(f == nullptr)
         return "";
@@ -93,6 +93,57 @@ std::string file::read(const std::string& file, file::mode::type m)
     fclose(f);
 
     return buffer;
+}
+
+std::string file::read(const std::string& file, file::mode::type m)
+{
+    #ifndef __EMSCRIPTEN__
+    return read_impl(file, m);
+    #else
+    return read_impl("web/" + file, m);
+    #endif
+}
+
+std::optional<std::string> file::request::read(const std::string& file, file::mode::type m)
+{
+    #ifndef __EMSCRIPTEN__
+    if(!file::exists(file))
+        return std::nullopt;
+
+    return file::read(file, m);
+    #else
+    emscripten_fetch_attr_t attr;
+    emscripten_fetch_attr_init(&attr);
+    strcpy(attr.requestMethod, "GET");
+    attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_SYNCHRONOUS;
+    emscripten_fetch_t *fetch = emscripten_fetch(&attr, file.c_str()); // Blocks here until the operation is complete.
+
+    std::optional<std::string> result;
+
+    if(fetch->status == 200)
+    {
+        printf("Finished downloading %llu bytes from URL %s.\n", fetch->numBytes, fetch->url);
+
+        result.emplace(fetch->data, fetch->data + fetch->numBytes);
+    }
+    else
+    {
+        //printf("Downloading %s failed, HTTP failure status code: %d.\n", fetch->url, fetch->status);
+    }
+
+    emscripten_fetch_close(fetch);
+
+    if(m == file::mode::TEXT && result.has_value())
+    {
+        std::string::size_type pos = 0;
+        while ((pos = result.value().find("\r\n", pos)) != std::string::npos)
+        {
+            result.value().replace(pos, 2, "\n");
+        }
+    }
+
+    return result;
+    #endif
 }
 
 void file::write(const std::string& file, const std::string& data, file::mode::type m)

@@ -2,6 +2,7 @@
 #define FS_HELPERS_HPP_INCLUDED
 
 #include <string>
+#include <optional>
 
 ///a directory should be without prefixes, eg a/hello.txt
 namespace file
@@ -30,6 +31,11 @@ namespace file
     bool remove(const std::string& name);
 
     void mkdir(const std::string& name);
+
+    namespace request
+    {
+        std::optional<std::string> read(const std::string& file, mode::type m);
+    }
 
     #ifdef __EMSCRIPTEN__
     // EMSCRIPTEN ONLY OBVIOUSLY
