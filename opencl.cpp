@@ -1147,7 +1147,7 @@ void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, co
     event_history.push_back({evt, store, "manual_depend"});
 }
 
-cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
 {
     for(int i=0; i < (int)event_history.size(); i++)
     {
@@ -1200,7 +1200,7 @@ cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
     return ret;
 }
 
-cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
 {
     cl::event ret;
 
@@ -1268,7 +1268,7 @@ cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<int>& glob
     return ret;
 }
 
-cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps)
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
 {
     assert(global_ws.size() == local_ws.size());
 
@@ -1289,7 +1289,7 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
     throw std::runtime_error("Kernel " + kname + " not found in any program");
 }
 
-cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws)
+cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws)
 {
     std::vector<cl::event> evts;
 

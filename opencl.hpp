@@ -653,9 +653,9 @@ namespace cl
         event enqueue_marker(const std::vector<event>& deps);
 
         ///apparently past me was not very bright, and used an int max work size here
-        event exec(cl::kernel& kern, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
-        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps);
-        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws);
+        event exec(cl::kernel& kern, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps = {});
+        event exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps);
+        event exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws);
         void block();
         void flush();
 
@@ -698,7 +698,7 @@ namespace cl
         void end_splice(cl::command_queue& cqueue);
 
         void getting_value_depends_on(cl::mem_object& obj, const cl::event& evt);
-        event exec(const std::string& kname, args& pack, const std::vector<int>& global_ws, const std::vector<int>& local_ws, const std::vector<event>& deps = {});
+        event exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps = {});
 
         void flush();
         void block();
