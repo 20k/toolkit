@@ -650,6 +650,8 @@ cl::buffer::buffer(cl::context& ctx)
 
 void cl::buffer::alloc(int64_t bytes)
 {
+    assert(bytes >= 0);
+
     alloc_size = bytes;
 
     native_mem_object.release();
@@ -1219,7 +1221,7 @@ cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<size_t>& g
 
         if((g_ws[i] % l_ws[i]) != 0)
         {
-            int rem = g_ws[i] % l_ws[i];
+            size_t rem = g_ws[i] % l_ws[i];
 
             g_ws[i] -= rem;
             g_ws[i] += l_ws[i];
