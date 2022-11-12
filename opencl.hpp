@@ -202,7 +202,7 @@ namespace cl
 
         template<typename T>
         inline
-        void push_back_base(const T& val, mem_object_access::type type = mem_object_access::READ_WRITE)
+        void push_back(const T& val)
         {
             std::unique_ptr<T> v = std::make_unique<T>(val);
 
@@ -213,7 +213,7 @@ namespace cl
             }
             else if constexpr(std::is_base_of_v<mem_object, T>)
             {
-                if(type != mem_object_access::NONE && v->native_mem_object.data != nullptr)
+                if(v->native_mem_object.data != nullptr)
                 {
                     memory_objects.add(v->native_mem_object.data);
                 }
@@ -230,34 +230,7 @@ namespace cl
             }
         }
 
-        template<typename T>
-        inline
-        void push_back(const T& val)
-        {
-            return push_back_base(val, mem_object_access::READ_WRITE);
-        }
-
-        template<typename T>
-        inline
-        void push_back_writable(const T& val)
-        {
-            return push_back_base(val, mem_object_access::WRITE);
-        }
-
-        template<typename T>
-        inline
-        void push_back_readable(const T& val)
-        {
-            return push_back_base(val, mem_object_access::READ);
-        }
-
-        template<typename T>
-        inline
-        void push_back_noaccess(const T& val)
-        {
-            ///push a nullptr?
-            return push_back_base(val, mem_object_access::NONE);
-        }
+    private:
 
         void push_arg(const std::shared_ptr<arg_base>& base)
         {

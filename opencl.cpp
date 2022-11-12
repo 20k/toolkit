@@ -797,6 +797,7 @@ cl::event cl::buffer::fill(cl::managed_command_queue& write_on, const void* patt
     *this, deps);
 }
 
+///I think it might be better to simply mark buffers
 namespace
 {
     cl::buffer as_props(cl::buffer& in, cl_mem_flags flags, cl_buffer_region region)
