@@ -115,24 +115,6 @@ namespace cl
         virtual ~arg_base(){}
     };
 
-    /*struct arg_view : arg_base
-    {
-        const void* ptr = nullptr;
-        size_t size = 0;
-
-        const void* fetch_ptr() override
-        {
-            return ptr;
-        }
-
-        size_t fetch_size() override
-        {
-            return size;
-        }
-
-        arg_view(){}
-    };*/
-
     template<typename T, typename U>
     struct arg_typed : arg_base
     {
@@ -156,8 +138,6 @@ namespace cl
         {
             return sizeof(U);
         }
-
-        ~arg_typed(){}
     };
 
     template<typename T, typename U>
