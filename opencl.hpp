@@ -40,6 +40,24 @@ namespace cl
             }
         }
 
+        void borrow(T raw)
+        {
+            if(data == raw)
+                return;
+
+            if(data)
+            {
+                V(data);
+            }
+
+            data = raw;
+
+            if(data)
+            {
+                U(data);
+            }
+        }
+
         void consume(T raw)
         {
             if(data)
@@ -142,13 +160,13 @@ namespace cl
 
     template<typename T, typename U>
     inline
-    std::shared_ptr<arg_base> build_from_args(std::unique_ptr<T>&& ptr, U* data)
+    std::unique_ptr<arg_base> build_from_args(std::unique_ptr<T>&& ptr, U* data)
     {
-        std::shared_ptr<arg_typed<T, U>> shared = std::make_shared<arg_typed<T, U>>();
+        arg_typed<T, U>* typed = new arg_typed<T, U>();
 
-        shared->take(std::move(ptr), data);
+        typed->take(std::move(ptr), data);
 
-        return std::dynamic_pointer_cast<arg_base>(shared);
+        return std::unique_ptr<arg_base>(typed);
     }
 
     using shared_mem_object = base<cl_mem, clRetainMemObject, clReleaseMemObject>;
@@ -167,17 +185,31 @@ namespace cl
         };
     }
 
+    struct mem_object
+    {
+        shared_mem_object native_mem_object;
+
+        cl_mem_flags get_flags();
+        std::optional<mem_object> get_parent();
+    };
+
+    inline
+    bool operator<(const mem_object& o1, const mem_object& o2)
+    {
+        return o1.native_mem_object.data < o2.native_mem_object.data;
+    }
+
     ///todo: cl_mem here might expire
     struct access_storage
     {
-        std::map<cl_mem, std::vector<cl_mem_flags>> store;
+        std::map<mem_object, std::vector<cl_mem_flags>> store;
 
-        void add(cl_mem in);
+        void add(const mem_object& in);
     };
 
     struct args
     {
-        std::vector<std::shared_ptr<arg_base>> arg_list;
+        std::vector<std::unique_ptr<arg_base>> arg_list;
         access_storage memory_objects;
 
         template<typename T>
@@ -195,7 +227,7 @@ namespace cl
             {
                 if(v->native_mem_object.data != nullptr)
                 {
-                    memory_objects.add(v->native_mem_object.data);
+                    memory_objects.add(*v);
                 }
 
                 cl_mem* ptr = &v->native_mem_object.data;
@@ -212,9 +244,9 @@ namespace cl
 
     private:
 
-        void push_arg(const std::shared_ptr<arg_base>& base)
+        void push_arg(std::unique_ptr<arg_base>&& base)
         {
-            arg_list.push_back(base);
+            arg_list.push_back(std::move(base));
         }
     };
 
@@ -295,16 +327,8 @@ namespace cl
     struct command_queue;
     struct managed_command_queue;
 
-    struct mem_object
-    {
-        shared_mem_object native_mem_object;
-
-        cl_mem_flags get_flags();
-        std::optional<cl_mem> get_parent();
-    };
-
-    std::optional<cl_mem> get_parent(cl_mem in);
-    cl_mem_flags get_flags(cl_mem in);
+    std::optional<cl::mem_object> get_parent(const cl::mem_object& in);
+    cl_mem_flags get_flags(const cl::mem_object& in);
 
     bool requires_memory_barrier(cl_mem in1, cl_mem in2);
 
@@ -668,7 +692,7 @@ namespace cl
             cl::event next = func(exec_on, evts);
 
             cl::access_storage store;
-            store.add(obj.native_mem_object.data);
+            store.add(obj);
 
             event_history.push_back({next, store, "generic"});
 

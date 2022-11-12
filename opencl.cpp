@@ -148,7 +148,7 @@ std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& mana
 std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& managed, cl::mem_object& obj)
 {
     cl::access_storage store;
-    store.add(obj.native_mem_object.data);
+    store.add(obj);
 
     return get_implicit_dependencies(managed, store);
 }
@@ -579,34 +579,38 @@ void cl::program::cancel()
 
 cl_mem_flags cl::mem_object::get_flags()
 {
-    return cl::get_flags(native_mem_object.data);
+    return cl::get_flags(*this);
 }
 
-std::optional<cl_mem> cl::mem_object::get_parent()
+std::optional<cl::mem_object> cl::mem_object::get_parent()
 {
-    return cl::get_parent(native_mem_object.data);
+    return cl::get_parent(*this);
 }
 
-std::optional<cl_mem> cl::get_parent(cl_mem in)
+std::optional<cl::mem_object> cl::get_parent(const cl::mem_object& in)
 {
     cl_mem ret;
-    clGetMemObjectInfo(in, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(cl_mem), &ret, nullptr);
+    clGetMemObjectInfo(in.native_mem_object.data, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(cl_mem), &ret, nullptr);
 
     if(ret == nullptr)
         return std::nullopt;
 
-    return ret;
+    ///reference count status of clGetMemObjectInfo is unclear, so explicit increment
+    cl::mem_object result;
+    result.native_mem_object.borrow(ret);
+
+    return result;
 }
 
-cl_mem_flags cl::get_flags(cl_mem in)
+cl_mem_flags cl::get_flags(const cl::mem_object& in)
 {
     cl_mem_flags ret = 0;
-    clGetMemObjectInfo(in, CL_MEM_FLAGS, sizeof(cl_mem_flags), &ret, nullptr);
+    clGetMemObjectInfo(in.native_mem_object.data, CL_MEM_FLAGS, sizeof(cl_mem_flags), &ret, nullptr);
 
     return ret;
 }
 
-bool cl::requires_memory_barrier(cl_mem in1, cl_mem in2)
+/*bool cl::requires_memory_barrier(cl_mem in1, cl_mem in2)
 {
     if(in1 == nullptr || in2 == nullptr)
         return false;
@@ -621,22 +625,22 @@ bool cl::requires_memory_barrier(cl_mem in1, cl_mem in2)
         return requires_memory_barrier_raw(cl::get_flags(in1), cl::get_flags(in2));
 
     return false;
-}
+}*/
 
-std::pair<cl_mem, cl_mem_flags> get_barrier_vars(cl_mem in);
+std::pair<cl::mem_object, cl_mem_flags> get_barrier_vars(const cl::mem_object& in);
 
-void cl::access_storage::add(cl_mem in)
+void cl::access_storage::add(const cl::mem_object& in)
 {
     auto vars = get_barrier_vars(in);
 
     store[vars.first].push_back(vars.second);
 }
 
-std::pair<cl_mem, cl_mem_flags> get_barrier_vars(cl_mem in)
+std::pair<cl::mem_object, cl_mem_flags> get_barrier_vars(const cl::mem_object& in)
 {
-    assert(in);
+    assert(in.native_mem_object.data);
 
-    std::optional<cl_mem> parent1 = cl::get_parent(in);
+    std::optional<cl::mem_object> parent1 = cl::get_parent(in);
 
     cl_mem_flags flags = cl::get_flags(in);
 
@@ -1145,7 +1149,7 @@ void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
 void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, const cl::event& evt)
 {
     cl::access_storage store;
-    store.add(obj.native_mem_object.data);
+    store.add(obj);
 
     event_history.push_back({evt, store, "manual_depend"});
 }
