@@ -1249,7 +1249,10 @@ cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<size_t>& g
         err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
     #else
 
-    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+    if(deps.size() > 0)
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
+    else
+        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
 
     cl_ulong start;
     cl_ulong finish;
