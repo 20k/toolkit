@@ -640,11 +640,16 @@ std::pair<cl::mem_object, cl_mem_flags> get_barrier_vars(const cl::mem_object& i
 {
     assert(in.native_mem_object.data);
 
-    std::optional<cl::mem_object> parent1 = cl::get_parent(in);
+    std::optional<cl::mem_object> parent = cl::get_parent(in);
+
+    if(parent.has_value())
+    {
+        assert(!cl::get_parent(parent.value()).has_value());
+    }
 
     cl_mem_flags flags = cl::get_flags(in);
 
-    return {parent1.value_or(in), flags};
+    return {parent.value_or(in), flags};
 }
 
 cl::buffer::buffer(cl::context& ctx)
@@ -1156,7 +1161,7 @@ void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, co
 
 cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
 {
-    for(int i=0; i < (int)event_history.size(); i++)
+    /*for(int i=0; i < (int)event_history.size(); i++)
     {
         cl::event& test = std::get<0>(event_history[i]);
 
@@ -1166,7 +1171,7 @@ cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, 
             i--;
             continue;
         }
-    }
+    }*/
 
     std::vector<cl::event> prior_deps = get_implicit_dependencies(*this, pack.memory_objects);
 

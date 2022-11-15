@@ -128,8 +128,8 @@ namespace cl
 
     struct arg_base
     {
-        virtual const void* fetch_ptr() = 0;
-        virtual size_t fetch_size() = 0;
+        virtual const void* fetch_ptr(){assert(false); return nullptr;};
+        virtual size_t fetch_size(){assert(false); return 0;};
         virtual ~arg_base(){}
     };
 
@@ -237,7 +237,7 @@ namespace cl
             {
                 static_assert(std::is_trivially_copyable_v<T>);
 
-                auto* ptr = v.get();
+                T* ptr = v.get();
                 push_arg(cl::build_from_args(std::move(v), ptr));
             }
         }
