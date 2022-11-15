@@ -117,7 +117,7 @@ namespace cl
             return *this;
         }
 
-        ~base()
+        virtual ~base()
         {
             if(data)
             {

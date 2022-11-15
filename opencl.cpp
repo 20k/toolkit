@@ -154,13 +154,16 @@ std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& mana
 }
 }
 
-static
-cl_event* get_event_pointer(const std::vector<cl::event>& events)
+std::vector<cl_event> to_raw_events(const std::vector<cl::event>& events)
 {
-    if(events.size() > 0)
-        return (cl_event*)&events[0];
+    std::vector<cl_event> ret;
 
-    return nullptr;
+    for(const cl::event& e : events)
+    {
+        ret.push_back(e.native_event.data);
+    }
+
+    return ret;
 }
 
 void cl::event::block()
@@ -745,21 +748,11 @@ cl::event cl::buffer::read_async(cl::command_queue& read_on, char* ptr, int64_t 
 {
     assert(bytes <= alloc_size);
 
-    std::vector<cl_event> evts;
-
-    for(auto& i : wait_on)
-    {
-        evts.push_back(i.native_event.data);
-    }
-
-    cl_event* eptr = nullptr;
-
-    if(evts.size() > 0)
-        eptr = evts.data();
-
+    std::vector<cl_event> evts = to_raw_events(wait_on);
+;
     cl::event evt;
 
-    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, ptr, evts.size(), eptr, &evt.native_event.data);
+    cl_int val = clEnqueueReadBuffer(read_on.native_command_queue.data, native_mem_object.data, CL_FALSE, 0, bytes, ptr, evts.size(), evts.data(), &evt.native_event.data);
 
     if(val != CL_SUCCESS)
     {
@@ -787,7 +780,9 @@ cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, siz
 {
     cl::event evt;
 
-    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, deps.size(), get_event_pointer(deps), &evt.native_event.data);
+    std::vector<cl_event> events = to_raw_events(deps);
+
+    cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, events.size(), events.data(), &evt.native_event.data);
 
     if(val != CL_SUCCESS)
     {
@@ -1205,9 +1200,11 @@ void cl::managed_command_queue::block()
 
 cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
 {
+    std::vector<cl_event> events = to_raw_events(deps);
+
     cl::event ret;
 
-    CHECK(clEnqueueMarkerWithWaitList(native_command_queue.data, deps.size(), get_event_pointer(deps), &ret.native_event.data));
+    CHECK(clEnqueueMarkerWithWaitList(native_command_queue.data, events.size(), events.data(), &ret.native_event.data));
 
     return ret;
 }
@@ -1243,21 +1240,15 @@ cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<size_t>& g
         }
     }
 
-    static_assert(sizeof(cl::event) == sizeof(cl_event));
+    std::vector<cl_event> events = to_raw_events(deps);
 
     cl_int err = CL_SUCCESS;
 
     #ifndef GPU_PROFILE
-    if(deps.size() > 0)
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
-    else
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, events.size(), events.data(), &ret.native_event.data);
     #else
 
-    if(deps.size() > 0)
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, deps.size(), (cl_event*)&deps[0], &ret.native_event.data);
-    else
-        err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, 0, nullptr, &ret.native_event.data);
+    err = clEnqueueNDRangeKernel(native_command_queue.data, kern.native_kernel.data, dim, nullptr, g_ws, l_ws, events.size(), events.data(), &ret.native_event.data);
 
     cl_ulong start;
     cl_ulong finish;
@@ -1454,16 +1445,18 @@ void cl::gl_rendertexture::create_from_framebuffer(GLuint _framebuffer_id)
     }*/
 }
 
-cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)
+cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue, const std::vector<cl::event>& deps)
 {
     cl::event ret;
 
     if(acquired)
         return ret;
 
+    std::vector<cl_event> events = to_raw_events(deps);
+
     acquired = true;
 
-    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), get_event_pointer(events), &ret.native_event.data);
+    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), events.data(), &ret.native_event.data);
 
     return ret;
 }
@@ -1473,16 +1466,18 @@ cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue)
     return acquire(cqueue, {});
 }
 
-cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue, const std::vector<cl::event>& events)
+cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue, const std::vector<cl::event>& deps)
 {
     cl::event ret;
 
     if(!acquired)
         return ret;
 
+    std::vector<cl_event> events = to_raw_events(deps);
+
     acquired = false;
 
-    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), get_event_pointer(events), &ret.native_event.data);
+    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), events.data(), &ret.native_event.data);
 
     return ret;
 }
