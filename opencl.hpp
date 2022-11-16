@@ -659,17 +659,18 @@ namespace cl
         void end_splice(cl::command_queue& cqueue);
 
         command_queue& next();
+        int next_by_id();
     };
 
     ///uses buffer info to execute things out of order
     struct managed_command_queue
     {
         multi_command_queue mqueue;
-        std::vector<std::tuple<cl::event, access_storage, std::string>> event_history;
+        std::vector<std::tuple<cl::event, access_storage, std::string, int>> event_history;
 
         managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
 
-        std::vector<cl::event> get_dependencies(cl::mem_object& obj);
+        std::vector<std::pair<cl::event, int>> get_dependencies(cl::mem_object& obj);
 
         void begin_splice(cl::command_queue& cqueue);
         void end_splice(cl::command_queue& cqueue);
@@ -683,18 +684,40 @@ namespace cl
         template<typename T>
         cl::event add(const T& func, cl::mem_object& obj, const std::vector<cl::event>& events)
         {
-            std::vector<cl::event> evts = get_dependencies(obj);
+            std::vector<std::pair<cl::event, int>> evts = get_dependencies(obj);
 
-            evts.insert(evts.end(), events.begin(), events.end());
+            std::vector<cl::event> deps = events;
 
-            cl::command_queue& exec_on = mqueue.next();
+            for(auto& i : evts)
+            {
+                deps.push_back(i.first);
+            }
 
-            cl::event next = func(exec_on, evts);
+
+            int queue_id = -1;
+
+            for(auto [e, i] : evts)
+            {
+                if(i != -1)
+                {
+                    queue_id = i;
+                    break;
+                }
+            }
+
+            if(queue_id == -1)
+            {
+                queue_id = mqueue.next_by_id();
+            }
+
+            cl::command_queue exec_on = mqueue.queues.at(queue_id);
+
+            cl::event next = func(exec_on, deps);
 
             cl::access_storage store;
             store.add(obj);
 
-            event_history.push_back({next, store, "generic"});
+            event_history.push_back({next, store, "generic", queue_id});
 
             return next;
         }

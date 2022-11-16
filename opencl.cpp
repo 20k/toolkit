@@ -130,22 +130,22 @@ bool requires_memory_barrier_sorted(const cl::access_storage& base, const cl::ac
     return false;
 }
 
-std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& managed, cl::access_storage& store)
+std::vector<std::pair<cl::event, int>> get_implicit_dependencies(cl::managed_command_queue& managed, cl::access_storage& store)
 {
-    std::vector<cl::event> deps;
+    std::vector<std::pair<cl::event, int>> deps;
 
-    for(const auto& [evt, args, tag] : managed.event_history)
+    for(const auto& [evt, args, tag, q_id] : managed.event_history)
     {
         if(requires_memory_barrier_sorted(store, args))
         {
-            deps.push_back(evt);
+            deps.push_back({evt, q_id});
         }
     }
 
     return deps;
 }
 
-std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& managed, cl::mem_object& obj)
+std::vector<std::pair<cl::event, int>> get_implicit_dependencies(cl::managed_command_queue& managed, cl::mem_object& obj)
 {
     cl::access_storage store;
     store.add(obj);
@@ -1127,9 +1127,18 @@ cl::command_queue& cl::multi_command_queue::next()
     return to_return;
 }
 
+int cl::multi_command_queue::next_by_id()
+{
+    int id = which;
+
+    which = (which + 1) % queues.size();
+
+    return id;
+}
+
 cl::managed_command_queue::managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count) : mqueue(ctx, props, queue_count){}
 
-std::vector<cl::event> cl::managed_command_queue::get_dependencies(cl::mem_object& obj)
+std::vector<std::pair<cl::event, int>> cl::managed_command_queue::get_dependencies(cl::mem_object& obj)
 {
     return get_implicit_dependencies(*this, obj);
 }
@@ -1151,12 +1160,12 @@ void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, co
     cl::access_storage store;
     store.add(obj);
 
-    event_history.push_back({evt, store, "manual_depend"});
+    event_history.push_back({evt, store, "manual_depend", -1});
 }
 
 cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
 {
-    /*for(int i=0; i < (int)event_history.size(); i++)
+    for(int i=0; i < (int)event_history.size(); i++)
     {
         cl::event& test = std::get<0>(event_history[i]);
 
@@ -1166,18 +1175,53 @@ cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, 
             i--;
             continue;
         }
-    }*/
+    }
 
-    std::vector<cl::event> prior_deps = get_implicit_dependencies(*this, pack.memory_objects);
+    /*std::vector<std::paicl::event> prior_deps = get_implicit_dependencies(*this, pack.memory_objects);
 
     prior_deps.insert(prior_deps.end(), deps.begin(), deps.end());
 
-    cl::command_queue& exec_on = mqueue.next();
+    //cl::command_queue& exec_on = mqueue.next();
 
     cl::event my_event = exec_on.exec(kname, pack, global_ws, local_ws, prior_deps);
     exec_on.flush();
 
     event_history.push_back({my_event, pack.memory_objects, kname});
+
+    return my_event;*/
+
+    std::vector<std::pair<cl::event, int>> evts = get_implicit_dependencies(*this, pack.memory_objects);
+
+    std::vector<cl::event> full_deps = deps;
+
+    for(auto& i : evts)
+    {
+        full_deps.push_back(i.first);
+    }
+
+    int queue_id = -1;
+
+    for(auto [e, i] : evts)
+    {
+        if(i != -1)
+        {
+            queue_id = std::max(i, queue_id);
+        }
+    }
+
+    if(queue_id == -1)
+    {
+        queue_id = mqueue.next_by_id();
+    }
+
+    printf("Queue id %i %s\n", queue_id, kname.c_str());
+
+    cl::command_queue exec_on = mqueue.queues.at(queue_id);
+
+    cl::event my_event = exec_on.exec(kname, pack, global_ws, local_ws, full_deps);
+    exec_on.flush();
+
+    event_history.push_back({my_event, pack.memory_objects, kname, queue_id});
 
     return my_event;
 }
