@@ -1143,7 +1143,7 @@ void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
 {
     mqueue.end_splice(cqueue);
 
-    //event_history.clear();
+    cleanup_events();
 }
 
 void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, const cl::event& evt)
