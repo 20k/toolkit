@@ -1143,7 +1143,7 @@ void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
 {
     mqueue.end_splice(cqueue);
 
-    event_history.clear();
+    //event_history.clear();
 }
 
 void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, const cl::event& evt)
@@ -1156,17 +1156,7 @@ void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, co
 
 cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
 {
-    /*for(int i=0; i < (int)event_history.size(); i++)
-    {
-        cl::event& test = std::get<0>(event_history[i]);
-
-        if(test.is_finished())
-        {
-            event_history.erase(event_history.begin() + i);
-            i--;
-            continue;
-        }
-    }*/
+    cleanup_events();
 
     std::vector<cl::event> prior_deps = get_implicit_dependencies(*this, pack.memory_objects);
 
@@ -1195,6 +1185,21 @@ void cl::managed_command_queue::block()
     for(cl::command_queue& q : mqueue.queues)
     {
         q.block();
+    }
+}
+
+void cl::managed_command_queue::cleanup_events()
+{
+    for(int i=0; i < (int)event_history.size(); i++)
+    {
+        cl::event& test = std::get<0>(event_history[i]);
+
+        if(test.is_finished())
+        {
+            event_history.erase(event_history.begin() + i);
+            i--;
+            continue;
+        }
     }
 }
 

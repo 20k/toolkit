@@ -680,9 +680,13 @@ namespace cl
         void flush();
         void block();
 
+        void cleanup_events();
+
         template<typename T>
         cl::event add(const T& func, cl::mem_object& obj, const std::vector<cl::event>& events)
         {
+            cleanup_events();
+
             std::vector<cl::event> evts = get_dependencies(obj);
 
             evts.insert(evts.end(), events.begin(), events.end());
