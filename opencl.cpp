@@ -840,12 +840,12 @@ cl::buffer cl::buffer::as_write_only()
 
 cl::buffer cl::buffer::as_device_read_only()
 {
-    return as_props_whole(*this, CL_MEM_READ_ONLY | CL_MEM_HOST_NO_ACCESS);
+    return as_props_whole(*this, CL_MEM_READ_ONLY);
 }
 
 cl::buffer cl::buffer::as_device_write_only()
 {
-    return as_props_whole(*this, CL_MEM_WRITE_ONLY | CL_MEM_HOST_NO_ACCESS);
+    return as_props_whole(*this, CL_MEM_WRITE_ONLY);
 }
 
 cl::buffer cl::buffer::as_device_inaccessible()
