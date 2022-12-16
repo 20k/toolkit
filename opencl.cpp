@@ -444,6 +444,8 @@ cl::program::program(context& ctx, const std::string& binary_data, cl::program::
 
 std::string cl::program::get_binary()
 {
+    ensure_built();
+
     size_t sizes[1] = {0};
     clGetProgramInfo(native_program.data, CL_PROGRAM_BINARY_SIZES, 1 * sizeof(size_t), sizes, NULL);
 
