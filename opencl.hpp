@@ -287,6 +287,8 @@ namespace cl
         program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
         program(context& ctx, const std::string& binary_data, binary_tag tag);
 
+        std::string get_binary();
+
         void build(context& ctx, const std::string& options);
         void ensure_built();
         bool is_built();

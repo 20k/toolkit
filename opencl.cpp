@@ -442,6 +442,21 @@ cl::program::program(context& ctx, const std::string& binary_data, cl::program::
     native_program.data = clCreateProgramWithBinary(ctx.native_context.data, 1, &selected_device, &length, (const unsigned char**)&binary_data_ptr, nullptr, nullptr);
 }
 
+std::string cl::program::get_binary()
+{
+    size_t sizes[1] = {0};
+    clGetProgramInfo(native_program.data, CL_PROGRAM_BINARY_SIZES, 1 * sizeof(size_t), sizes, NULL);
+
+    std::string binary;
+    binary.resize(sizes[0]);
+
+    char* binary_ptr = binary.data();
+
+    clGetProgramInfo(native_program.data, CL_PROGRAM_BINARIES, 1 * sizeof(char*), &binary_ptr, NULL);
+
+    return binary;
+}
+
 void debug_build_status(cl_program prog, cl_device_id selected_device)
 {
     cl_build_status bstatus = CL_BUILD_ERROR;
