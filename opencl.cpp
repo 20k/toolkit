@@ -428,6 +428,20 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
+cl::program::program(context& ctx, const std::string& binary_data, cl::program::binary_tag tag)
+{
+    selected_device = ctx.selected_device;
+
+    assert(binary_data.size() > 0);
+
+    async = std::make_shared<async_context>();
+
+    size_t length = binary_data.size();
+    const char* binary_data_ptr = binary_data.c_str();
+
+    native_program.data = clCreateProgramWithBinary(ctx.native_context.data, 1, &selected_device, &length, (const unsigned char**)&binary_data_ptr, nullptr, nullptr);
+}
+
 void debug_build_status(cl_program prog, cl_device_id selected_device)
 {
     cl_build_status bstatus = CL_BUILD_ERROR;

@@ -267,6 +267,8 @@ namespace cl
 
     struct program
     {
+        struct binary_tag{};
+
         cl_device_id selected_device;
 
         struct async_context
@@ -283,6 +285,7 @@ namespace cl
         program(context& ctx);
         program(context& ctx, const std::string& data, bool is_file = true);
         program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
+        program(context& ctx, const std::string& binary_data, binary_tag tag);
 
         void build(context& ctx, const std::string& options);
         void ensure_built();
