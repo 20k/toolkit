@@ -2,6 +2,31 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 
+texture::texture()
+{
+
+}
+
+texture::texture(texture&& other)
+{
+    dim = other.dim;
+    handle = other.handle;
+
+    other.handle = 0;
+    other.dim = {0,0};
+}
+
+texture& texture::operator=(texture&& other)
+{
+    dim = other.dim;
+    handle = other.handle;
+
+    other.handle = 0;
+    other.dim = {0,0};
+
+    return *this;
+}
+
 void texture::load_from_memory(const uint8_t* pixels_rgba, vec2i _dim)
 {
     if(handle != 0)

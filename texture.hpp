@@ -18,6 +18,13 @@ struct texture
 {
     unsigned int handle = 0;
 
+    texture();
+    texture(texture&&);
+    texture& operator=(texture&& other);
+
+    texture(const texture&) = delete;
+    texture& operator=(const texture&) = delete;
+
     [[deprecated]]
     void load_from_memory(const uint8_t* pixels_rgba, vec2i dim);
 
