@@ -801,6 +801,8 @@ namespace cl
 
         std::vector<char> value = get_device_info(id, param);
 
+        assert(value.size() == sizeof(T));
+
         memcpy(&ret, value.data(), value.size() * sizeof(char));
 
         return ret;
