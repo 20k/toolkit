@@ -1539,7 +1539,7 @@ cl::event cl::gl_rendertexture::unacquire(cl::managed_command_queue& mqueue, con
     *this, events);
 }
 
-cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest)
+cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events)
 {
     cl::event evt;
 
@@ -1547,7 +1547,9 @@ cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& de
 
     size_t amount = std::min(source.alloc_size, dest.alloc_size);
 
-    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, 0, nullptr, &evt.native_event.data);
+    std::vector<cl_event> raw_events = to_raw_events(events);
+
+    cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, raw_events.size(), raw_events.data(), &evt.native_event.data);
 
     if(err != CL_SUCCESS)
     {
@@ -1555,6 +1557,32 @@ cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& de
     }
 
     return evt;
+}
+
+cl::event cl::copy(cl::managed_command_queue& mqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events)
+{
+    mqueue.cleanup_events();
+
+    auto evts_1 = mqueue.get_dependencies(source);
+    auto evts_2 = mqueue.get_dependencies(dest);
+
+    std::vector<cl::event> all_events;
+
+    all_events.insert(all_events.end(), evts_1.begin(), evts_1.end());
+    all_events.insert(all_events.end(), evts_2.begin(), evts_2.end());
+    all_events.insert(all_events.end(), events.begin(), events.end());
+
+    cl::command_queue& exec_on = mqueue.mqueue.next();
+
+    cl::event next = cl::copy(exec_on, source, dest, all_events);
+
+    cl::access_storage store;
+    store.add(source);
+    store.add(dest);
+
+    mqueue.event_history.push_back({next, store, "copy"});
+
+    return next;
 }
 
 std::string cl::get_extensions(context& ctx)

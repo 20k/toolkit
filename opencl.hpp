@@ -199,7 +199,6 @@ namespace cl
         return o1.native_mem_object.data < o2.native_mem_object.data;
     }
 
-    ///todo: cl_mem here might expire
     struct access_storage
     {
         std::map<mem_object, std::vector<cl_mem_flags>> store;
@@ -768,7 +767,8 @@ namespace cl
         }
     };
 
-    event copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest);
+    event copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events = {});
+    event copy(cl::managed_command_queue& cqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events = {});
 
     template<typename T, typename U>
     void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec3i origin, vec3i region)
