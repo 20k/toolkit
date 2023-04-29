@@ -435,6 +435,8 @@ namespace cl
             if(alloc_size == 0)
                 return ret;
 
+            assert((alloc_size % sizeof(T)) == 0);
+
             ret.resize(alloc_size / sizeof(T));
 
             read(read_on, (char*)&ret[0], alloc_size);
