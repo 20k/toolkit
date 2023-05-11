@@ -211,6 +211,14 @@ namespace cl
         std::vector<std::unique_ptr<arg_base>> arg_list;
         access_storage memory_objects;
 
+        template<typename T, typename... U>
+        inline
+        void push_back(const T& t, U&&... u)
+        {
+            push_back(t);
+            push_back(std::forward<U>(u)...);
+        }
+
         template<typename T>
         inline
         void push_back(const T& val)
