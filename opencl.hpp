@@ -314,6 +314,16 @@ namespace cl
         int argument_count = 0;
 
         void set_args(cl::args& pack);
+
+        template<typename... T>
+        void set_args(T&&... args)
+        {
+            cl::args in_args;
+            in_args.push_back(std::forward<T>(args)...);
+
+            set_args(in_args);
+        }
+
         cl_program fetch_program();
 
         kernel clone();
