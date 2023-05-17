@@ -18,6 +18,11 @@ texture::texture(texture&& other)
 
 texture& texture::operator=(texture&& other)
 {
+    if(handle != 0)
+    {
+        glDeleteTextures(1, &handle);
+    }
+
     dim = other.dim;
     handle = other.handle;
 
