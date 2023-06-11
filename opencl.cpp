@@ -363,6 +363,13 @@ void cl::context::deregister_program(int idx)
     programs.erase(programs.begin() + idx);
 }
 
+void cl::context::register_kernel(const std::string& name, cl::kernel kern)
+{
+    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
+
+    which[name] = kern;
+}
+
 cl::kernel cl::context::fetch_kernel(std::string_view name)
 {
     for(auto& program_map : *kernels)

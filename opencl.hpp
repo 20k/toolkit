@@ -343,6 +343,8 @@ namespace cl
         void register_program(program& p);
         void deregister_program(int idx);
 
+        void register_kernel(const std::string& name, cl::kernel kern);
+
         kernel fetch_kernel(std::string_view name);
     };
 
