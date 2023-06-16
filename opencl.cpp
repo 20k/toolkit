@@ -792,7 +792,7 @@ cl::event cl::buffer::read_async(cl::command_queue& read_on, char* ptr, int64_t 
 
     if(val != CL_SUCCESS)
     {
-        throw std::runtime_error("Could not read_async");
+        throw std::runtime_error("Could not read_async " + std::to_string(val));
     }
 
     return evt;

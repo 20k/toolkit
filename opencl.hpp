@@ -419,6 +419,8 @@ namespace cl
             if(elements == 0)
                 return ret;
 
+            assert(elements * sizeof(T) <= alloc_size);
+
             ret.data = new T[elements];
             ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T), {});
 
