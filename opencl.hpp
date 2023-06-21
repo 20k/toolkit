@@ -126,49 +126,6 @@ namespace cl
         }
     };
 
-    struct arg_base
-    {
-        virtual const void* fetch_ptr(){assert(false); return nullptr;};
-        virtual size_t fetch_size(){assert(false); return 0;};
-        virtual ~arg_base(){}
-    };
-
-    template<typename T, typename U>
-    struct arg_typed : arg_base
-    {
-        ///keep the underlying value alive
-        std::unique_ptr<T> val;
-        ///pointer to the data to pass to the kernel
-        U* data = nullptr;
-
-        void take(std::unique_ptr<T>&& v, U* data_ptr)
-        {
-            val = std::move(v);
-            data = data_ptr;
-        }
-
-        const void* fetch_ptr() override
-        {
-            return data;
-        }
-
-        size_t fetch_size() override
-        {
-            return sizeof(U);
-        }
-    };
-
-    template<typename T, typename U>
-    inline
-    std::unique_ptr<arg_base> build_from_args(std::unique_ptr<T>&& ptr, U* data)
-    {
-        arg_typed<T, U>* typed = new arg_typed<T, U>();
-
-        typed->take(std::move(ptr), data);
-
-        return std::unique_ptr<arg_base>(typed);
-    }
-
     using shared_mem_object = base<cl_mem, clRetainMemObject, clReleaseMemObject>;
 
     struct command_queue;
@@ -206,9 +163,64 @@ namespace cl
         void add(const mem_object& in);
     };
 
+    struct kernel;
+
+    struct callback_helper_base
+    {
+        virtual void callback(kernel& kern, int idx)
+        {
+            assert(false);
+        }
+
+        virtual ~callback_helper_base(){}
+    };
+
+    template<typename T>
+    struct callback_helper_intermediate : callback_helper_base
+    {
+        T t;
+
+        callback_helper_intermediate(T&& in) : t(std::move(in)){}
+        callback_helper_intermediate(const T& in) : t(in){}
+
+        virtual std::pair<void*, size_t> get_ptr(){assert(false);}
+
+        virtual void callback(kernel& kern, int idx) override
+        {
+            auto [ptr, size] = get_ptr();
+
+            clSetKernelArg(kern.native_kernel.data, idx, size, ptr);
+        }
+    };
+
+    template<typename T>
+    struct callback_helper_generic : callback_helper_intermediate<T>
+    {
+        callback_helper_generic(T&& in) : callback_helper_intermediate<T>(std::move(in)){}
+        callback_helper_generic(const T& in) : callback_helper_intermediate<T>(in){}
+
+        virtual std::pair<void*, size_t> get_ptr()
+        {
+            if constexpr(std::is_base_of_v<command_queue, T>)
+            {
+                return {&this->t.native_command_queue.data, sizeof(cl_command_queue)};
+            }
+            else if constexpr(std::is_base_of_v<mem_object, T>)
+            {
+                return {&this->t.native_mem_object.data, sizeof(cl_mem)};
+            }
+            else
+            {
+                static_assert(std::is_trivially_copyable_v<T>);
+
+                return {&this->t, sizeof(T)};
+            }
+        }
+    };
+
     struct args
     {
-        std::vector<std::unique_ptr<arg_base>> arg_list;
+        std::vector<std::unique_ptr<callback_helper_base>> arg_list;
         access_storage memory_objects;
 
         template<typename T, typename... U>
@@ -223,35 +235,21 @@ namespace cl
         inline
         void push_back(const T& val)
         {
-            std::unique_ptr<T> v = std::make_unique<T>(val);
-
-            if constexpr(std::is_base_of_v<command_queue, T>)
+            if constexpr(std::is_base_of_v<mem_object, T>)
             {
-                cl_command_queue* ptr = &v->native_commmand_queue.data;
-                push_arg(cl::build_from_args(std::move(v), ptr));
-            }
-            else if constexpr(std::is_base_of_v<mem_object, T>)
-            {
-                if(v->native_mem_object.data != nullptr)
+                if(val.native_mem_object.data != nullptr)
                 {
-                    memory_objects.add(*v);
+                    memory_objects.add(val);
                 }
-
-                cl_mem* ptr = &v->native_mem_object.data;
-                push_arg(cl::build_from_args(std::move(v), ptr));
             }
-            else
-            {
-                static_assert(std::is_trivially_copyable_v<T>);
 
-                T* ptr = v.get();
-                push_arg(cl::build_from_args(std::move(v), ptr));
-            }
+            std::unique_ptr<callback_helper_base> owned = std::make_unique<callback_helper_generic<T>>(val);
+
+            arg_list.push_back(std::move(owned));
         }
 
     private:
-
-        void push_arg(std::unique_ptr<arg_base>&& base)
+        void push_arg(std::unique_ptr<callback_helper_base>&& base)
         {
             arg_list.push_back(std::move(base));
         }

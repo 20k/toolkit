@@ -257,7 +257,7 @@ void cl::kernel::set_args(cl::args& pack)
 
     for(int i=0; i < (int)pack.arg_list.size(); i++)
     {
-        clSetKernelArg(native_kernel.data, i, pack.arg_list[i]->fetch_size(), pack.arg_list[i]->fetch_ptr());
+        pack.arg_list[i]->callback(*this, i);
     }
 }
 
