@@ -247,12 +247,6 @@ namespace cl
 
             arg_list.push_back(std::move(owned));
         }
-
-    private:
-        void push_arg(std::unique_ptr<callback_helper_base>&& base)
-        {
-            arg_list.push_back(std::move(base));
-        }
     };
 
     bool requires_memory_barrier(args& a1, args& a2);
