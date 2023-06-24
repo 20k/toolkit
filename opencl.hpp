@@ -167,7 +167,7 @@ namespace cl
 
     struct callback_helper_base
     {
-        virtual void callback(kernel& kern, int idx)
+        virtual void callback(cl_kernel kern, int idx)
         {
             assert(false);
         }
@@ -176,30 +176,21 @@ namespace cl
     };
 
     template<typename T>
-    struct callback_helper_intermediate : callback_helper_base
+    struct callback_helper_generic : callback_helper_base
     {
         T t;
 
-        callback_helper_intermediate(T&& in) : t(std::move(in)){}
-        callback_helper_intermediate(const T& in) : t(in){}
+        callback_helper_generic(T&& in) : t(std::move(in)){}
+        callback_helper_generic(const T& in) : t(in){}
 
-        virtual std::pair<void*, size_t> get_ptr(){assert(false);}
-
-        virtual void callback(kernel& kern, int idx) override
+        void callback(cl_kernel kern, int idx) override
         {
             auto [ptr, size] = get_ptr();
 
-            clSetKernelArg(kern.native_kernel.data, idx, size, ptr);
+            clSetKernelArg(kern, idx, size, ptr);
         }
-    };
 
-    template<typename T>
-    struct callback_helper_generic : callback_helper_intermediate<T>
-    {
-        callback_helper_generic(T&& in) : callback_helper_intermediate<T>(std::move(in)){}
-        callback_helper_generic(const T& in) : callback_helper_intermediate<T>(in){}
-
-        virtual std::pair<void*, size_t> get_ptr()
+        std::pair<void*, size_t> get_ptr()
         {
             if constexpr(std::is_base_of_v<command_queue, T>)
             {
