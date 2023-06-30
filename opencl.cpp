@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <thread>
 #include "clock.hpp"
+#include <mutex>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -341,7 +342,7 @@ void cl::context::register_program(cl::program& p)
 {
     p.ensure_built();
 
-    programs.push_back(p);
+    std::scoped_lock guard(kernels_lock);
 
     std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
 
@@ -353,34 +354,66 @@ void cl::context::register_program(cl::program& p)
 
 void cl::context::deregister_program(int idx)
 {
-    if(idx < 0 || idx >= (int)programs.size())
-        throw std::runtime_error("idx < 0 || idx >= programs.size() in deregister_program for cl::context");
+    std::scoped_lock guard(kernels_lock);
 
-    assert(programs.size() == kernels->size());
+    if(idx < 0 || idx >= (int)kernels->size())
+        throw std::runtime_error("idx < 0 || idx >= kernels->size() in deregister_program for cl::context");
 
-    ///??????? This seems incredibly wrong
     kernels->erase(kernels->begin() + idx);
-    programs.erase(programs.begin() + idx);
 }
 
-void cl::context::register_kernel(const std::string& name, cl::kernel kern)
+void cl::context::register_kernel(const cl::kernel& kern, std::optional<std::string> name_override, bool can_overlap_existing)
 {
-    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
+    std::string name = name_override.value_or(kern.name);
 
+    std::scoped_lock guard(kernels_lock);
+
+    if(!can_overlap_existing)
+    {
+        for(const auto& v : *kernels)
+        {
+            for(const auto& [check_name, kern] : v)
+            {
+                if(check_name == name)
+                    throw std::runtime_error("Kernel with name " + check_name + " already exists");
+            }
+        }
+    }
+
+    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
     which[name] = kern;
 }
 
 cl::kernel cl::context::fetch_kernel(std::string_view name)
 {
-    for(auto& program_map : *kernels)
+    std::scoped_lock guard(kernels_lock);
+
+    for(auto& v : *kernels)
     {
-        if(auto it = program_map.find(name); it != program_map.end())
+        for(auto& [key, val] : v)
         {
-            return it->second;
+            if(key == name)
+                return val;
         }
     }
 
     throw std::runtime_error("no such kernel in context");
+}
+
+void cl::context::remove_kernel(std::string_view name)
+{
+    std::scoped_lock guard(kernels_lock);
+
+    for(int i=0; i < (int)kernels->size(); i++)
+    {
+        for(auto it = (*kernels)[i].begin(); it != (*kernels)[i].end();)
+        {
+            if(it->first == name)
+                it = (*kernels)[i].erase(it);
+            else
+                it++;
+        }
+    }
 }
 
 cl::program::program(context& ctx)
@@ -509,8 +542,7 @@ struct async_setter
 
     ~async_setter()
     {
-        async_ctx->finished_waiter.test_and_set();
-        async_ctx->finished_waiter.notify_all();
+        async_ctx->latch.count_down();
     }
 };
 
@@ -586,29 +618,12 @@ void cl::program::build(context& ctx, const std::string& options)
 
 void cl::program::ensure_built()
 {
-    if(is_built())
-        return;
-
-    async->finished_waiter.wait(false);
-
-    if(!is_built())
-    {
-        printf("Program not built\n");
-        return;
-    }
-
-    cl_build_status status = CL_BUILD_ERROR;
-    clGetProgramBuildInfo(native_program.data, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &status, nullptr);
-
-    if(status != CL_SUCCESS)
-    {
-        debug_build_status(*this);
-    }
+    async->latch.wait();
 }
 
 bool cl::program::is_built()
 {
-    return async->finished_waiter.test();
+    return async->latch.try_wait();
 }
 
 void cl::program::cancel()

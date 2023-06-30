@@ -17,6 +17,7 @@
 #include <optional>
 #include <functional>
 #include <span>
+#include <latch>
 
 namespace cl
 {
@@ -263,8 +264,7 @@ namespace cl
 
         struct async_context
         {
-            std::atomic_flag finished_waiter;
-            std::atomic_bool built{false};
+            std::latch latch{1};
             std::atomic_bool cancelled{false};
             std::map<std::string, cl::kernel> built_kernels;
         };
@@ -314,7 +314,6 @@ namespace cl
 
     struct context
     {
-        std::vector<program> programs;
         std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
         cl_device_id selected_device;
 
@@ -326,9 +325,13 @@ namespace cl
         void register_program(program& p);
         void deregister_program(int idx);
 
-        void register_kernel(const std::string& name, cl::kernel kern);
+        void register_kernel(const cl::kernel& kern, std::optional<std::string> name_override = std::nullopt, bool can_overlap_existing = false);
 
         kernel fetch_kernel(std::string_view name);
+        void remove_kernel(std::string_view name);
+
+        private:
+        std::mutex kernels_lock;
     };
 
     struct command_queue;
