@@ -290,6 +290,7 @@ cl::kernel cl::kernel::clone()
 cl::context::context()
 {
     kernels = std::make_shared<std::vector<std::map<std::string, kernel, std::less<>>>>();
+    pending_kernels = std::make_shared<std::vector<std::pair<std::string, std::shared_ptr<pending_kernel>>>>();
 
     cl_platform_id pid = {};
     get_platform_ids(&pid);
@@ -342,8 +343,6 @@ void cl::context::register_program(cl::program& p)
 {
     p.ensure_built();
 
-    std::scoped_lock guard(kernels_lock);
-
     std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
 
     for(auto& [name, kern] : p.async->built_kernels)
@@ -354,8 +353,6 @@ void cl::context::register_program(cl::program& p)
 
 void cl::context::deregister_program(int idx)
 {
-    std::scoped_lock guard(kernels_lock);
-
     if(idx < 0 || idx >= (int)kernels->size())
         throw std::runtime_error("idx < 0 || idx >= kernels->size() in deregister_program for cl::context");
 
@@ -365,8 +362,6 @@ void cl::context::deregister_program(int idx)
 void cl::context::register_kernel(const cl::kernel& kern, std::optional<std::string> name_override, bool can_overlap_existing)
 {
     std::string name = name_override.value_or(kern.name);
-
-    std::scoped_lock guard(kernels_lock);
 
     if(!can_overlap_existing)
     {
@@ -384,10 +379,13 @@ void cl::context::register_kernel(const cl::kernel& kern, std::optional<std::str
     which[name] = kern;
 }
 
+void cl::context::register_kernel(std::shared_ptr<pending_kernel> pending, const std::string& name)
+{
+    pending_kernels->push_back({name, std::move(pending)});
+}
+
 cl::kernel cl::context::fetch_kernel(std::string_view name)
 {
-    std::scoped_lock guard(kernels_lock);
-
     for(auto& v : *kernels)
     {
         for(auto& [key, val] : v)
@@ -402,8 +400,6 @@ cl::kernel cl::context::fetch_kernel(std::string_view name)
 
 void cl::context::remove_kernel(std::string_view name)
 {
-    std::scoped_lock guard(kernels_lock);
-
     for(int i=0; i < (int)kernels->size(); i++)
     {
         for(auto it = (*kernels)[i].begin(); it != (*kernels)[i].end();)
@@ -1087,7 +1083,7 @@ void cl::image_with_mipmaps::write_impl(command_queue& write_on, const char* ptr
     }
 }
 
-cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : kernels(ctx.kernels)
+cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : kernels(ctx.kernels), pending_kernels(ctx.pending_kernels)
 {
     cl_int err;
 
@@ -1346,6 +1342,25 @@ cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, cons
         kern.set_args(pack);
 
         return exec(kern, global_ws, local_ws, deps);
+    }
+
+    for(auto it = pending_kernels->begin(); it != pending_kernels->end();)
+    {
+        if(kname != it->first)
+        {
+            it++;
+            continue;
+        }
+
+        it->second->latch.wait();
+
+        std::map<std::string, kernel, std::less<>>& next = kernels->emplace_back();
+
+        next[it->first] = it->second->kern.value();
+
+        pending_kernels->erase(it);
+
+        return exec(kname, pack, global_ws, local_ws, deps);
     }
 
     throw std::runtime_error("Kernel " + kname + " not found in any program");

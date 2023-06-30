@@ -312,9 +312,16 @@ namespace cl
         kernel clone();
     };
 
+    struct pending_kernel
+    {
+        std::optional<cl::kernel> kern;
+        std::latch latch{1};
+    };
+
     struct context
     {
         std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
+        std::shared_ptr<std::vector<std::pair<std::string, std::shared_ptr<pending_kernel>>>> pending_kernels;
         cl_device_id selected_device;
 
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -326,12 +333,10 @@ namespace cl
         void deregister_program(int idx);
 
         void register_kernel(const cl::kernel& kern, std::optional<std::string> name_override = std::nullopt, bool can_overlap_existing = false);
+        void register_kernel(std::shared_ptr<pending_kernel> pending, const std::string& produced_name);
 
         kernel fetch_kernel(std::string_view name);
         void remove_kernel(std::string_view name);
-
-        private:
-        std::mutex kernels_lock;
     };
 
     struct command_queue;
@@ -638,6 +643,7 @@ namespace cl
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
         std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
+        std::shared_ptr<std::vector<std::pair<std::string, std::shared_ptr<pending_kernel>>>> pending_kernels;
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 
