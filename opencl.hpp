@@ -272,14 +272,14 @@ namespace cl
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
         std::shared_ptr<async_context> async;
 
-        program(context& ctx);
-        program(context& ctx, const std::string& data, bool is_file = true);
-        program(context& ctx, const std::vector<std::string>& data, bool is_file = true);
-        program(context& ctx, const std::string& binary_data, binary_tag tag);
+        program(const context& ctx);
+        program(const context& ctx, const std::string& data, bool is_file = true);
+        program(const context& ctx, const std::vector<std::string>& data, bool is_file = true);
+        program(const context& ctx, const std::string& binary_data, binary_tag tag);
 
         std::string get_binary();
 
-        void build(context& ctx, const std::string& options);
+        void build(const context& ctx, const std::string& options);
         void ensure_built();
         bool is_built();
         void cancel(); ///purely optional
@@ -314,14 +314,22 @@ namespace cl
 
     struct pending_kernel
     {
-        std::optional<cl::kernel> kern;
+        std::optional<cl::kernel> kernel;
         std::latch latch{1};
+    };
+
+    struct shared_kernel_info
+    {
+        std::vector<std::map<std::string, kernel, std::less<>>> kernels;
+        std::vector<std::pair<std::string, std::shared_ptr<pending_kernel>>> pending_kernels;
+        std::mutex mut;
+
+        bool promote_pending(const std::string& name);
     };
 
     struct context
     {
-        std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
-        std::shared_ptr<std::vector<std::pair<std::string, std::shared_ptr<pending_kernel>>>> pending_kernels;
+        std::shared_ptr<shared_kernel_info> shared;
         cl_device_id selected_device;
 
         base<cl_context, clRetainContext, clReleaseContext> native_context;
@@ -642,8 +650,8 @@ namespace cl
     {
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
-        std::shared_ptr<std::vector<std::map<std::string, kernel, std::less<>>>> kernels;
-        std::shared_ptr<std::vector<std::pair<std::string, std::shared_ptr<pending_kernel>>>> pending_kernels;
+
+        std::shared_ptr<shared_kernel_info> shared;
 
         command_queue(context& ctx, cl_command_queue_properties props = 0);
 

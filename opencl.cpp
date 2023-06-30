@@ -289,8 +289,7 @@ cl::kernel cl::kernel::clone()
 
 cl::context::context()
 {
-    kernels = std::make_shared<std::vector<std::map<std::string, kernel, std::less<>>>>();
-    pending_kernels = std::make_shared<std::vector<std::pair<std::string, std::shared_ptr<pending_kernel>>>>();
+    shared = std::make_shared<shared_kernel_info>();
 
     cl_platform_id pid = {};
     get_platform_ids(&pid);
@@ -343,7 +342,9 @@ void cl::context::register_program(cl::program& p)
 {
     p.ensure_built();
 
-    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
+    std::scoped_lock lock(shared->mut);
+
+    std::map<std::string, cl::kernel, std::less<>>& which = shared->kernels.emplace_back();
 
     for(auto& [name, kern] : p.async->built_kernels)
     {
@@ -353,19 +354,23 @@ void cl::context::register_program(cl::program& p)
 
 void cl::context::deregister_program(int idx)
 {
-    if(idx < 0 || idx >= (int)kernels->size())
+    std::scoped_lock lock(shared->mut);
+
+    if(idx < 0 || idx >= (int)shared->kernels.size())
         throw std::runtime_error("idx < 0 || idx >= kernels->size() in deregister_program for cl::context");
 
-    kernels->erase(kernels->begin() + idx);
+    shared->kernels.erase(shared->kernels.begin() + idx);
 }
 
 void cl::context::register_kernel(const cl::kernel& kern, std::optional<std::string> name_override, bool can_overlap_existing)
 {
+    std::scoped_lock lock(shared->mut);
+
     std::string name = name_override.value_or(kern.name);
 
     if(!can_overlap_existing)
     {
-        for(const auto& v : *kernels)
+        for(const auto& v : shared->kernels)
         {
             for(const auto& [check_name, kern] : v)
             {
@@ -375,18 +380,22 @@ void cl::context::register_kernel(const cl::kernel& kern, std::optional<std::str
         }
     }
 
-    std::map<std::string, cl::kernel, std::less<>>& which = kernels->emplace_back();
+    std::map<std::string, cl::kernel, std::less<>>& which = shared->kernels.emplace_back();
     which[name] = kern;
 }
 
 void cl::context::register_kernel(std::shared_ptr<pending_kernel> pending, const std::string& name)
 {
-    pending_kernels->push_back({name, std::move(pending)});
+    std::scoped_lock lock(shared->mut);
+
+    shared->pending_kernels.push_back({name, std::move(pending)});
 }
 
 cl::kernel cl::context::fetch_kernel(std::string_view name)
 {
-    for(auto& v : *kernels)
+    std::scoped_lock lock(shared->mut);
+
+    for(auto& v : shared->kernels)
     {
         for(auto& [key, val] : v)
         {
@@ -400,29 +409,31 @@ cl::kernel cl::context::fetch_kernel(std::string_view name)
 
 void cl::context::remove_kernel(std::string_view name)
 {
-    for(int i=0; i < (int)kernels->size(); i++)
+    std::scoped_lock lock(shared->mut);
+
+    for(int i=0; i < (int)shared->kernels.size(); i++)
     {
-        for(auto it = (*kernels)[i].begin(); it != (*kernels)[i].end();)
+        for(auto it = shared->kernels[i].begin(); it != shared->kernels[i].end();)
         {
             if(it->first == name)
-                it = (*kernels)[i].erase(it);
+                it = shared->kernels[i].erase(it);
             else
                 it++;
         }
     }
 }
 
-cl::program::program(context& ctx)
+cl::program::program(const context& ctx)
 {
     selected_device = ctx.selected_device;
 }
 
-cl::program::program(context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
+cl::program::program(const context& ctx, const std::string& data, bool is_file) : program(ctx, std::vector{data}, is_file)
 {
 
 }
 
-cl::program::program(context& ctx, const std::vector<std::string>& data, bool is_file)
+cl::program::program(const context& ctx, const std::vector<std::string>& data, bool is_file)
 {
     selected_device = ctx.selected_device;
 
@@ -464,7 +475,7 @@ cl::program::program(context& ctx, const std::vector<std::string>& data, bool is
     native_program.data = clCreateProgramWithSource(ctx.native_context.data, data.size(), &data_ptrs[0], nullptr, nullptr);
 }
 
-cl::program::program(context& ctx, const std::string& binary_data, cl::program::binary_tag tag)
+cl::program::program(const context& ctx, const std::string& binary_data, cl::program::binary_tag tag)
 {
     selected_device = ctx.selected_device;
 
@@ -542,7 +553,7 @@ struct async_setter
     }
 };
 
-void cl::program::build(context& ctx, const std::string& options)
+void cl::program::build(const context& ctx, const std::string& options)
 {
     std::string build_options = "-cl-single-precision-constant " + options;
 
@@ -1083,7 +1094,7 @@ void cl::image_with_mipmaps::write_impl(command_queue& write_on, const char* ptr
     }
 }
 
-cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : kernels(ctx.kernels), pending_kernels(ctx.pending_kernels)
+cl::command_queue::command_queue(cl::context& ctx, cl_command_queue_properties props) : shared(ctx.shared)
 {
     cl_int err;
 
@@ -1113,7 +1124,7 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
 {
     cl_int err;
 
-    kernels = ctx.kernels;
+    shared = ctx.shared;
 
     cl_queue_properties qprop[] = { CL_QUEUE_SIZE, 4096, CL_QUEUE_PROPERTIES,
      (cl_command_queue_properties)(CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE |
@@ -1326,41 +1337,90 @@ cl::event cl::command_queue::exec(cl::kernel& kern, const std::vector<size_t>& g
     return ret;
 }
 
+bool cl::shared_kernel_info::promote_pending(const std::string& name)
+{
+    std::shared_ptr<pending_kernel> pend;
+
+    {
+        std::scoped_lock lock(mut);
+        bool found = false;
+
+        for(auto& [check_name, ptr] : pending_kernels)
+        {
+            if(check_name == name)
+            {
+                pend = ptr;
+                found = true;
+            }
+        }
+
+        if(!found)
+            return false;
+    }
+
+    pend->latch.wait();
+
+    {
+        std::scoped_lock lock(mut);
+
+        bool should_add = false;
+
+        ///someone might have done the same thing in the meantime, remove us from pending_kernels but don't be too surprised if its not found
+
+        for(auto it = pending_kernels.begin(); it != pending_kernels.end();)
+        {
+            if(it->second == pend)
+            {
+                ///only add us to the kernels list if we were the one that removed us from pending kernels
+                should_add = true;
+                break;
+            }
+            else
+                it++;
+        }
+
+        ///race condition in that someone did this first, but still a valid sign for the caller to re-check
+        if(!should_add)
+            return true;
+
+        std::map<std::string, kernel, std::less<>>& next = kernels.emplace_back();
+        next[name] = pend->kernel.value();
+    }
+
+    return true;
+}
+
 cl::event cl::command_queue::exec(const std::string& kname, cl::args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
 {
     assert(global_ws.size() == local_ws.size());
 
-    for(auto& kerns : *kernels)
     {
-        auto kernel_it = kerns.find(kname);
+        std::vector<std::map<std::string, kernel, std::less<>>> current;
 
-        if(kernel_it == kerns.end())
-            continue;
-
-        cl::kernel& kern = kernel_it->second;
-
-        kern.set_args(pack);
-
-        return exec(kern, global_ws, local_ws, deps);
-    }
-
-    for(auto it = pending_kernels->begin(); it != pending_kernels->end();)
-    {
-        if(kname != it->first)
         {
-            it++;
-            continue;
+            std::scoped_lock lock(shared->mut);
+
+            current = shared->kernels;
         }
 
-        it->second->latch.wait();
+        for(auto& kerns : current)
+        {
+            auto kernel_it = kerns.find(kname);
 
-        std::map<std::string, kernel, std::less<>>& next = kernels->emplace_back();
+            if(kernel_it == kerns.end())
+                continue;
 
-        next[it->first] = it->second->kern.value();
+            cl::kernel& kern = kernel_it->second;
 
-        pending_kernels->erase(it);
+            kern.set_args(pack);
 
-        return exec(kname, pack, global_ws, local_ws, deps);
+            return exec(kern, global_ws, local_ws, deps);
+        }
+    }
+
+    if(shared->promote_pending(kname))
+    {
+        exec(kname, pack, global_ws, local_ws, deps);
     }
 
     throw std::runtime_error("Kernel " + kname + " not found in any program");
