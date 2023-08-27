@@ -470,6 +470,8 @@ namespace cl
         cl::buffer as_device_read_only();
         cl::buffer as_device_write_only();
         cl::buffer as_device_inaccessible();
+
+        cl::buffer slice(int64_t offset, int64_t length, cl_mem_flags flags = 0);
     };
 
     struct image_base : mem_object

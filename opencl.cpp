@@ -872,6 +872,7 @@ namespace
         assert(err == 0);
 
         ret.native_mem_object.consume(as_subobject);
+        ret.alloc_size = region.size;
 
         return ret;
     }
@@ -913,6 +914,15 @@ cl::buffer cl::buffer::as_device_inaccessible()
     buf.native_mem_object.release();
 
     return buf;
+}
+
+cl::buffer cl::buffer::slice(int64_t offset, int64_t length, cl_mem_flags flags)
+{
+    cl_buffer_region region;
+    region.origin = offset;
+    region.size = length;
+
+    return as_props(*this, flags, region);
 }
 
 cl::image::image(cl::context& ctx)
