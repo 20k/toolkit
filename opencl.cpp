@@ -703,9 +703,14 @@ std::pair<cl::mem_object, cl_mem_flags> get_barrier_vars(const cl::mem_object& i
 
     std::optional<cl::mem_object> parent = cl::get_parent(in);
 
-    if(parent.has_value())
+    while(parent.has_value())
     {
-        assert(!cl::get_parent(parent.value()).has_value());
+        auto next_parent_opt = cl::get_parent(parent.value());
+
+        if(next_parent_opt.has_value())
+            parent = next_parent_opt;
+        else
+            break;
     }
 
     cl_mem_flags flags = cl::get_flags(in);
@@ -866,8 +871,14 @@ namespace
     {
         cl::buffer ret = in;
 
+        assert(region.origin >= 0);
+        assert(region.origin + region.size <= in.alloc_size);
+
         cl_int err = 0;
         cl_mem as_subobject = clCreateSubBuffer(in.native_mem_object.data, flags, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+
+        if(err != 0)
+            throw std::runtime_error("Bad object in clcreatesubbuffer " + std::to_string(err));
 
         assert(err == 0);
 
