@@ -736,6 +736,7 @@ namespace cl
 
     struct gl_rendertexture : image_base
     {
+        bool sharing_is_available = false;
         bool acquired = false;
         base<cl_context, clRetainContext, clReleaseContext> native_context;
 
@@ -815,6 +816,8 @@ namespace cl
     }
 
     std::string get_extensions(context& ctx);
+
+    bool supports_extension(cl_device_id id, const std::string& name);
     bool supports_extension(context& ctx, const std::string& name);
 
     std::vector<char> get_device_info(cl_device_id id, cl_device_info param);

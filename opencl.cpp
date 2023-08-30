@@ -301,41 +301,61 @@ cl::context::context()
 
     selected_device = devices[0];
 
-    #ifdef _WIN32
-    cl_context_properties props[] =
+    if(cl::supports_extension(selected_device, "cl_khr_gl_sharing"))
     {
-        CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
-        CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
-        CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
-        0
-    };
-    #elif defined(__APPLE__)
-    CGLContextObj cgl_context = CGLGetCurrentContext();
-    CGLShareGroupObj cgl_share_group = CGLGetShareGroup(cgl_current_context);
+        #ifdef _WIN32
+        cl_context_properties props[] =
+        {
+            CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
+            CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
+            CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
+            0
+        };
+        #elif defined(__APPLE__)
+        CGLContextObj cgl_context = CGLGetCurrentContext();
+        CGLShareGroupObj cgl_share_group = CGLGetShareGroup(cgl_current_context);
 
-    cl_context_properties properties[] = {
-        CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
-        (cl_context_properties) cgl_share_group,
-        0
-    };
-    #else
-    cl_context_properties props[] =
+        cl_context_properties properties[] = {
+            CL_CONTEXT_PROPERTY_USE_CGL_SHAREGROUP_APPLE,
+            (cl_context_properties) cgl_share_group,
+            0
+        };
+        #else
+        cl_context_properties props[] =
+        {
+            CL_GL_CONTEXT_KHR, (cl_context_properties)glXGetCurrentContext(),
+            CL_GLX_DISPLAY_KHR, (cl_context_properties)glXGetCurrentDisplay(),
+            CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
+            0
+        };
+        #endif
+
+        cl_int error = 0;
+
+        cl_context ctx = clCreateContext(props, 1, &selected_device, nullptr, nullptr, &error);
+
+        if(error != CL_SUCCESS)
+            throw std::runtime_error("Failed to create context " + std::to_string(error));
+
+        native_context.data = ctx;
+    }
+    else
     {
-        CL_GL_CONTEXT_KHR, (cl_context_properties)glXGetCurrentContext(),
-        CL_GLX_DISPLAY_KHR, (cl_context_properties)glXGetCurrentDisplay(),
-        CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
-        0
-    };
-    #endif
+        cl_context_properties props[] =
+        {
+            CL_CONTEXT_PLATFORM, (cl_context_properties)pid,
+            0
+        };
 
-    cl_int error = 0;
+        cl_int error = 0;
 
-    cl_context ctx = clCreateContext(props, 1, &selected_device, nullptr, nullptr, &error);
+        cl_context ctx = clCreateContext(props, 1, &selected_device, nullptr, nullptr, &error);
 
-    if(error != CL_SUCCESS)
-        throw std::runtime_error("Failed to create context " + std::to_string(error));
+        if(error != CL_SUCCESS)
+            throw std::runtime_error("Failed to create context " + std::to_string(error));
 
-    native_context.data = ctx;
+        native_context.data = ctx;
+    }
 }
 
 void cl::context::register_program(cl::program& p)
@@ -1467,10 +1487,14 @@ void cl::command_queue::flush()
 cl::gl_rendertexture::gl_rendertexture(context& ctx)
 {
     native_context = ctx.native_context;
+
+    sharing_is_available = cl::supports_extension(ctx, "cl_khr_gl_sharing");
 }
 
 void cl::gl_rendertexture::create(int _w, int _h)
 {
+    assert(sharing_is_available);
+
     sizes[0] = _w;
     sizes[1] = _h;
 
@@ -1505,20 +1529,6 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
     ///Do I need this?
     glBindTexture(GL_TEXTURE_2D, _texture_id);
 
-    native_mem_object.release();
-
-    cl_int err;
-    cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, _texture_id, &err);
-
-    if(err != CL_SUCCESS)
-    {
-        std::cout << "Failure in create from rendertexture " << err << std::endl;
-        throw std::runtime_error("Failure in create_from rendertexture");
-    }
-
-    texture_id = _texture_id;
-    native_mem_object.consume(cmem);
-
     int w, h, d;
     int miplevel = 0;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &w);
@@ -1532,11 +1542,60 @@ void cl::gl_rendertexture::create_from_texture(GLuint _texture_id)
         d = 1;
 
     sizes[2] = d;
+
+    native_mem_object.release();
+
+    if(sharing_is_available)
+    {
+        cl_int err;
+        cl_mem cmem = clCreateFromGLTexture(native_context.data, CL_MEM_READ_WRITE, GL_TEXTURE_2D, 0, _texture_id, &err);
+
+        if(err != CL_SUCCESS)
+        {
+            std::cout << "Failure in create from rendertexture " << err << std::endl;
+            throw std::runtime_error("Failure in create_from rendertexture");
+        }
+
+        native_mem_object.consume(cmem);
+    }
+    else
+    {
+        cl_image_format format;
+        format.image_channel_order = CL_RGBA;
+        format.image_channel_data_type = CL_FLOAT;
+
+        cl_image_desc desc = {};
+        desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+        desc.image_width = w;
+        desc.image_height = h;
+        desc.image_depth = d;
+        desc.image_array_size = 1;
+        desc.image_row_pitch = 0;
+        desc.image_slice_pitch = 0;
+        desc.num_mip_levels = 0;
+        desc.num_samples = 0;
+        desc.buffer = nullptr;
+
+        cl_int err;
+        cl_mem cmem = clCreateImage(native_context.data, CL_MEM_READ_WRITE, &format, &desc, nullptr, &err);
+
+        if(err != CL_SUCCESS)
+        {
+            std::cout << "Failure in create from rendertexture " << err << std::endl;
+            throw std::runtime_error("Failure in create_from rendertexture");
+        }
+
+        native_mem_object.consume(cmem);
+    }
+
+    texture_id = _texture_id;
 }
 
 ///unfortunately, this does not support -1 which would have been superhumanly useful
 void cl::gl_rendertexture::create_from_texture_with_mipmaps(GLuint _texture_id, int mip_level)
 {
+    assert(sharing_is_available);
+
     ///Do I need this?
     glBindTexture(GL_TEXTURE_2D, _texture_id);
 
@@ -1608,7 +1667,8 @@ cl::event cl::gl_rendertexture::acquire(cl::command_queue& cqueue, const std::ve
 
     acquired = true;
 
-    clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), events.data(), &ret.native_event.data);
+    if(sharing_is_available)
+        clEnqueueAcquireGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), events.data(), &ret.native_event.data);
 
     return ret;
 }
@@ -1629,7 +1689,23 @@ cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue, const std::
 
     acquired = false;
 
-    clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), events.data(), &ret.native_event.data);
+    if(sharing_is_available)
+    {
+        clEnqueueReleaseGLObjects(cqueue.native_command_queue.data, 1, &native_mem_object.data, events.size(), events.data(), &ret.native_event.data);
+    }
+    else
+    {
+        std::vector<cl_event> raw_events = to_raw_events(deps);
+
+        if(raw_events.size() > 0)
+            clWaitForEvents(raw_events.size(), raw_events.data());
+
+        std::vector<cl_float4> data = this->read<2, cl_float4>(cqueue, {0,0}, {sizes[0], sizes[1]});
+
+        glBindTexture(GL_TEXTURE_2D, texture_id);
+
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, sizes[0], sizes[1], GL_RGBA, GL_FLOAT, (void*)data.data());
+    }
 
     return ret;
 }
@@ -1724,10 +1800,10 @@ std::string cl::get_extensions(context& ctx)
     return extensions;
 }
 
-bool cl::supports_extension(cl::context& ctx, const std::string& name)
+bool cl::supports_extension(cl_device_id device_id, const std::string& name)
 {
     size_t arr_size = 0;
-    cl_int err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, 0, nullptr, &arr_size);
+    cl_int err = clGetDeviceInfo(device_id, CL_DEVICE_EXTENSIONS, 0, nullptr, &arr_size);
 
     if(err != CL_SUCCESS)
     {
@@ -1740,7 +1816,7 @@ bool cl::supports_extension(cl::context& ctx, const std::string& name)
     std::string extensions;
     extensions.resize(arr_size + 1);
 
-    err = clGetDeviceInfo(ctx.selected_device, CL_DEVICE_EXTENSIONS, arr_size, &extensions[0], nullptr);
+    err = clGetDeviceInfo(device_id, CL_DEVICE_EXTENSIONS, arr_size, &extensions[0], nullptr);
 
     if(err != CL_SUCCESS)
     {
@@ -1748,6 +1824,11 @@ bool cl::supports_extension(cl::context& ctx, const std::string& name)
     }
 
     return extensions.find(name) != std::string::npos;
+}
+
+bool cl::supports_extension(cl::context& ctx, const std::string& name)
+{
+   return supports_extension(ctx.selected_device, name);
 }
 
 std::vector<char> cl::get_device_info(cl_device_id id, cl_device_info param)
