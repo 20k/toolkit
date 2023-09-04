@@ -19,8 +19,28 @@
 #include <span>
 #include <latch>
 
+#ifndef __clang__
+#include <stdfloat>
+#endif
+
+namespace cl_adl
+{
+    template<typename T>
+    inline
+    std::array<T, 1> type_to_array(const T& in)
+    {
+        return std::array<T, 1>{in};
+    }
+}
+
 namespace cl
 {
+    #ifndef __clang__
+    using cl_float16_impl = std::float16_t;
+    #else
+    using cl_float16_impl = _Float16;
+    #endif
+
     template<typename T, cl_int(*U)(T), cl_int(*V)(T)>
     struct base
     {
@@ -127,6 +147,67 @@ namespace cl
         }
     };
 
+    #define DECLARE_VECTOR_OPENCL_TYPE(real_type, cl_type) \
+        inline cl_type type_to_opencl(real_type v){return v;} \
+        inline cl_type##2 type_to_opencl(cl_type##2 v){return v;} \
+        inline cl_type##4 type_to_opencl(cl_type##4 v){return v;} \
+
+    DECLARE_VECTOR_OPENCL_TYPE(int64_t, cl_long)
+    DECLARE_VECTOR_OPENCL_TYPE(uint64_t, cl_ulong)
+    DECLARE_VECTOR_OPENCL_TYPE(int32_t, cl_int)
+    DECLARE_VECTOR_OPENCL_TYPE(uint32_t, cl_uint)
+    DECLARE_VECTOR_OPENCL_TYPE(int16_t, cl_short)
+    DECLARE_VECTOR_OPENCL_TYPE(uint16_t, cl_ushort)
+    DECLARE_VECTOR_OPENCL_TYPE(int8_t, cl_char)
+    DECLARE_VECTOR_OPENCL_TYPE(uint8_t, cl_uchar)
+    DECLARE_VECTOR_OPENCL_TYPE(double, cl_double)
+    DECLARE_VECTOR_OPENCL_TYPE(float, cl_float)
+    DECLARE_VECTOR_OPENCL_TYPE(cl_float16_impl, cl_half)
+
+    inline
+    cl_mem type_to_opencl(std::nullptr_t){return nullptr;}
+
+    inline
+    cl_sampler type_to_opencl(cl_sampler v){return v;}
+
+    inline
+    cl_command_queue type_to_opencl(cl_command_queue v){return v;}
+
+    template<typename T, std::size_t N>
+    inline
+    auto to_opencl_from_array(std::array<T, N> raw)
+    {
+        #define MAPS_TO(real_type, cl_type) \
+        if constexpr(std::is_same_v<T, real_type> && N == 4) \
+            return cl_type##4{raw[0], raw[1], raw[2], raw[3]}; \
+        if constexpr(std::is_same_v<T, real_type> && N == 3) \
+            return cl_type##3{raw[0], raw[1], raw[2]}; \
+        if constexpr(std::is_same_v<T, real_type> && N == 2) \
+            return cl_type##2{raw[0], raw[1]}; \
+        if constexpr(std::is_same_v<T, real_type> && N == 1) \
+            return cl_type{raw[0]};
+
+
+        if constexpr (N == 1)
+            return type_to_opencl(raw[0]);
+
+        MAPS_TO(int64_t, cl_long);
+        MAPS_TO(uint64_t, cl_ulong);
+        MAPS_TO(int32_t, cl_int);
+        MAPS_TO(uint32_t, cl_uint);
+        MAPS_TO(int16_t, cl_short);
+        MAPS_TO(uint16_t, cl_ushort);
+        MAPS_TO(int8_t, cl_char);
+        MAPS_TO(uint8_t, cl_uchar);
+
+        MAPS_TO(double, cl_double);
+        MAPS_TO(float, cl_float);
+        MAPS_TO(cl_float16_impl, cl_half);
+
+        assert(false);
+    }
+
+
     using shared_mem_object = base<cl_mem, clRetainMemObject, clReleaseMemObject>;
 
     struct command_queue;
@@ -180,9 +261,10 @@ namespace cl
     struct callback_helper_generic : callback_helper_base
     {
         T t;
+        decltype(to_opencl_from_array(cl_adl::type_to_array(std::declval<T>()))) native_type;
 
-        callback_helper_generic(T&& in) : t(std::move(in)){}
-        callback_helper_generic(const T& in) : t(in){}
+        callback_helper_generic(T&& in) : t(std::move(in)){native_type = to_opencl_from_array(cl_adl::type_to_array(t));}
+        callback_helper_generic(const T& in) : t(in){native_type = to_opencl_from_array(cl_adl::type_to_array(t));}
 
         void callback(cl_kernel kern, int idx) override
         {
@@ -252,6 +334,10 @@ namespace cl
         bool is_finished();
         void set_completion_callback(void (CL_CALLBACK* pfn_notify)(cl_event event, cl_int event_command_status, void *user_data), void* userdata);
     };
+
+
+    inline
+    cl_event type_to_opencl(const event& e){return e.native_event.data;}
 
     struct context;
     struct kernel;
@@ -474,6 +560,9 @@ namespace cl
         cl::buffer slice(int64_t offset, int64_t length, cl_mem_flags flags = 0);
     };
 
+    inline
+    cl_mem type_to_opencl(const mem_object& in){return in.native_mem_object.data;};
+
     struct image_base : mem_object
     {
         void clear(cl::command_queue& cqueue);
@@ -669,6 +758,9 @@ namespace cl
     protected:
         command_queue();
     };
+
+    inline
+    cl_command_queue type_to_opencl(command_queue& in){return in.native_command_queue.data;};
 
     struct device_command_queue : command_queue
     {
