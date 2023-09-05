@@ -737,6 +737,21 @@ namespace cl
         }
     };
 
+    namespace detail
+    {
+        template<typename T>
+        inline
+        std::vector<size_t> array_to_vec(const T& in)
+        {
+            std::vector<size_t> out;
+
+            for(const auto& i : in)
+                out.push_back(i);
+
+            return out;
+        }
+    }
+
     struct command_queue
     {
         base<cl_command_queue, clRetainCommandQueue, clReleaseCommandQueue> native_command_queue;
@@ -752,6 +767,19 @@ namespace cl
         event exec(cl::kernel& kern, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps = {});
         event exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps);
         event exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws);
+
+        template<typename T>
+        event exec(const std::string& kname, args& pack, const T& global_ws, const T& local_ws, const std::vector<event>& deps = {})
+        {
+            auto global_as_array = cl_adl::type_to_array(global_ws);
+            auto local_as_array = cl_adl::type_to_array(local_ws);
+
+            std::vector<size_t> global_as_vec = detail::array_to_vec(global_as_array);
+            std::vector<size_t> local_as_vec = detail::array_to_vec(local_as_array);
+
+            return exec(kname, pack, global_as_vec, global_as_vec, deps);
+        }
+
         void block();
         void flush();
 
@@ -798,6 +826,18 @@ namespace cl
 
         void getting_value_depends_on(cl::mem_object& obj, const cl::event& evt);
         event exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps = {});
+
+        template<typename T>
+        event exec(const std::string& kname, args& pack, const T& global_ws, const T& local_ws, const std::vector<event>& deps = {})
+        {
+            auto global_as_array = cl_adl::type_to_array(global_ws);
+            auto local_as_array = cl_adl::type_to_array(local_ws);
+
+            std::vector<size_t> global_as_vec = detail::array_to_vec(global_as_array);
+            std::vector<size_t> local_as_vec = detail::array_to_vec(local_as_array);
+
+            return exec(kname, pack, global_as_vec, global_as_vec, deps);
+        }
 
         void flush();
         void block();
