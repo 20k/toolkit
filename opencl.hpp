@@ -4,7 +4,11 @@
 #include <vector>
 #include <map>
 #include <string>
+#ifndef FAST_CL
 #include <CL/cl.h>
+#else
+#include <libfastcl/fastcl/cl.h>
+#endif
 #include <memory>
 #include <GL/glew.h>
 #include <GL/gl.h>
@@ -270,7 +274,12 @@ namespace cl
         {
             auto [ptr, size] = get_ptr();
 
-            clSetKernelArg(kern, idx, size, ptr);
+            #ifdef FAST_CL
+            if constexpr(std::is_base_of_v<mem_object, T>)
+                clSetKernelArgMemEx(kern, idx, size, ptr);
+            else
+            #endif
+                clSetKernelArg(kern, idx, size, ptr);
         }
 
         std::pair<void*, size_t> get_ptr()
