@@ -304,7 +304,6 @@ namespace cl
     struct args
     {
         std::vector<std::unique_ptr<callback_helper_base>> arg_list;
-        access_storage memory_objects;
 
         template<typename T, typename... U>
         inline
@@ -318,22 +317,11 @@ namespace cl
         inline
         void push_back(const T& val)
         {
-            if constexpr(std::is_base_of_v<mem_object, T>)
-            {
-                if(val.native_mem_object.data != nullptr)
-                {
-                    memory_objects.add(val);
-                }
-            }
-
             std::unique_ptr<callback_helper_base> owned = std::make_unique<callback_helper_generic<T>>(val);
 
             arg_list.push_back(std::move(owned));
         }
     };
-
-    bool requires_memory_barrier(args& a1, args& a2);
-    bool requires_memory_barrier(const std::vector<shared_mem_object>& a1, const std::vector<shared_mem_object>& a2);
 
     struct event
     {
@@ -443,7 +431,6 @@ namespace cl
     };
 
     struct command_queue;
-    struct managed_command_queue;
 
     std::optional<cl::mem_object> get_parent(const cl::mem_object& in);
     cl_mem_flags get_flags(const cl::mem_object& in);
@@ -524,19 +511,8 @@ namespace cl
         cl::event set_to_zero(command_queue& write_on);
         cl::event fill(command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps = std::vector<cl::event>());
 
-        cl::event set_to_zero(managed_command_queue& write_on);
-        cl::event fill(managed_command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps = std::vector<cl::event>());
-
         template<typename T>
         cl::event fill(command_queue& write_on, const T& value)
-        {
-            assert((alloc_size % sizeof(T)) == 0);
-
-            return fill(write_on, (void*)&value, sizeof(T), alloc_size);
-        }
-
-        template<typename T>
-        cl::event fill(managed_command_queue& write_on, const T& value)
         {
             assert((alloc_size % sizeof(T)) == 0);
 
@@ -804,77 +780,6 @@ namespace cl
         device_command_queue(context& ctx, cl_command_queue_properties props = 0);
     };
 
-    ///this functions as a real unordered command queue
-    struct multi_command_queue
-    {
-        std::vector<command_queue> queues;
-        int which = 0;
-
-        multi_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
-
-        ///syncs cqueue with our queue
-        ///kind of models fork join
-        void begin_splice(cl::command_queue& cqueue);
-        void end_splice(cl::command_queue& cqueue);
-
-        command_queue& next();
-    };
-
-    ///uses buffer info to execute things out of order
-    struct managed_command_queue
-    {
-        multi_command_queue mqueue;
-        std::vector<std::tuple<cl::event, access_storage, std::string>> event_history;
-
-        managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count);
-
-        std::vector<cl::event> get_dependencies(cl::mem_object& obj);
-
-        void begin_splice(cl::command_queue& cqueue);
-        void end_splice(cl::command_queue& cqueue);
-
-        void getting_value_depends_on(cl::mem_object& obj, const cl::event& evt);
-        event exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps = {});
-
-        template<typename T>
-        event exec(const std::string& kname, args& pack, const T& global_ws, const T& local_ws, const std::vector<event>& deps = {})
-        {
-            auto global_as_array = cl_adl::type_to_array(global_ws);
-            auto local_as_array = cl_adl::type_to_array(local_ws);
-
-            std::vector<size_t> global_as_vec = detail::array_to_vec(global_as_array);
-            std::vector<size_t> local_as_vec = detail::array_to_vec(local_as_array);
-
-            return exec(kname, pack, global_as_vec, global_as_vec, deps);
-        }
-
-        void flush();
-        void block();
-
-        void cleanup_events();
-
-        template<typename T>
-        cl::event add(const T& func, cl::mem_object& obj, const std::vector<cl::event>& events)
-        {
-            cleanup_events();
-
-            std::vector<cl::event> evts = get_dependencies(obj);
-
-            evts.insert(evts.end(), events.begin(), events.end());
-
-            cl::command_queue& exec_on = mqueue.next();
-
-            cl::event next = func(exec_on, evts);
-
-            cl::access_storage store;
-            store.add(obj);
-
-            event_history.push_back({next, store, "generic"});
-
-            return next;
-        }
-    };
-
     struct gl_rendertexture : image_base
     {
         bool sharing_is_available = false;
@@ -895,9 +800,6 @@ namespace cl
 
         event acquire(command_queue& cqueue, const std::vector<cl::event>& events);
         event unacquire(command_queue& cqueue, const std::vector<cl::event>& events);
-
-        event acquire(managed_command_queue& cqueue, const std::vector<cl::event>& events = std::vector<cl::event>());
-        event unacquire(managed_command_queue& cqueue, const std::vector<cl::event>& events = std::vector<cl::event>());
     };
 
     template<int N, typename T>
@@ -936,7 +838,6 @@ namespace cl
     };
 
     event copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events = {});
-    event copy(cl::managed_command_queue& cqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events = {});
 
     template<typename T, typename U>
     void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec3i origin, vec3i region)

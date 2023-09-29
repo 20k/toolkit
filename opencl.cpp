@@ -97,64 +97,6 @@ void get_platform_ids(cl_platform_id* clSelectedPlatformID)
 
 namespace
 {
-bool requires_memory_barrier_raw(cl_mem_flags flag1, cl_mem_flags flag2)
-{
-    ///do not need a memory barrier between two overlapping objects if and only if they're both read only
-    if((flag1 & CL_MEM_READ_ONLY) && (flag2 & CL_MEM_READ_ONLY))
-        return false;
-
-    //if((flag1 & CL_MEM_WRITE_ONLY) && (flag2 & CL_MEM_WRITE_ONLY))
-    //    return false;
-
-    return true;
-}
-
-bool requires_memory_barrier_sorted(const cl::access_storage& base, const cl::access_storage& theirs)
-{
-    for(auto& [mem, flags] : theirs.store)
-    {
-        auto it = base.store.find(mem);
-
-        if(it == base.store.end())
-            continue;
-
-        for(cl_mem_flags f : it->second)
-        {
-            for(cl_mem_flags g : flags)
-            {
-                if(requires_memory_barrier_raw(f, g))
-                    return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& managed, cl::access_storage& store)
-{
-    std::vector<cl::event> deps;
-
-    for(const auto& [evt, args, tag] : managed.event_history)
-    {
-        if(requires_memory_barrier_sorted(store, args))
-        {
-            deps.push_back(evt);
-        }
-    }
-
-    return deps;
-}
-
-std::vector<cl::event> get_implicit_dependencies(cl::managed_command_queue& managed, cl::mem_object& obj)
-{
-    cl::access_storage store;
-    store.add(obj);
-
-    return get_implicit_dependencies(managed, store);
-}
-}
-
 std::vector<cl_event> to_raw_events(const std::vector<cl::event>& events)
 {
     std::vector<cl_event> ret;
@@ -165,6 +107,7 @@ std::vector<cl_event> to_raw_events(const std::vector<cl::event>& events)
     }
 
     return ret;
+}
 }
 
 void cl::event::block()
@@ -852,13 +795,6 @@ cl::event cl::buffer::set_to_zero(cl::command_queue& write_on)
     return fill(write_on, (const char*)&zero, 1, alloc_size);
 }
 
-cl::event cl::buffer::set_to_zero(cl::managed_command_queue& write_on)
-{
-    static int zero = 0;
-
-    return fill(write_on, (const char*)&zero, 1, alloc_size);
-}
-
 cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps)
 {
     cl::event evt;
@@ -873,15 +809,6 @@ cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, siz
     }
 
     return evt;
-}
-
-cl::event cl::buffer::fill(cl::managed_command_queue& write_on, const void* pattern, size_t pattern_size, size_t size, const std::vector<cl::event>& deps)
-{
-    return write_on.add([&](cl::command_queue& cqueue, const std::vector<cl::event>& full)
-    {
-        return fill(cqueue, pattern, pattern_size, size, full);
-    },
-    *this, deps);
 }
 
 ///I think it might be better to simply mark buffers
@@ -1182,124 +1109,6 @@ cl::device_command_queue::device_command_queue(cl::context& ctx, cl_command_queu
 
     native_command_queue.data = cqueue;
     native_context = ctx.native_context;
-}
-
-cl::multi_command_queue::multi_command_queue(context& ctx, cl_command_queue_properties props, int queue_count)
-{
-    if(queue_count <= 0)
-        throw std::runtime_error("Must pass in >= 1 queue");
-
-    for(int i=0; i < queue_count; i++)
-    {
-        queues.emplace_back(ctx, props);
-    }
-}
-
-void cl::multi_command_queue::begin_splice(cl::command_queue& cqueue)
-{
-    cl::event marker = cqueue.enqueue_marker({});
-
-    for(int i=0; i < (int)queues.size(); i++)
-    {
-        queues[i].enqueue_marker({marker});
-    }
-}
-
-void cl::multi_command_queue::end_splice(cl::command_queue& cqueue)
-{
-    std::vector<cl::event> events;
-
-    for(int i=0; i < (int)queues.size(); i++)
-    {
-        events.push_back(queues[i].enqueue_marker({}));
-    }
-
-    cqueue.enqueue_marker(events);
-}
-
-cl::command_queue& cl::multi_command_queue::next()
-{
-    cl::command_queue& to_return = queues[which];
-
-    which = (which + 1) % queues.size();
-
-    return to_return;
-}
-
-cl::managed_command_queue::managed_command_queue(context& ctx, cl_command_queue_properties props, int queue_count) : mqueue(ctx, props, queue_count){}
-
-std::vector<cl::event> cl::managed_command_queue::get_dependencies(cl::mem_object& obj)
-{
-    return get_implicit_dependencies(*this, obj);
-}
-
-void cl::managed_command_queue::begin_splice(cl::command_queue& cqueue)
-{
-    mqueue.begin_splice(cqueue);
-}
-
-void cl::managed_command_queue::end_splice(cl::command_queue& cqueue)
-{
-    mqueue.end_splice(cqueue);
-
-    cleanup_events();
-}
-
-void cl::managed_command_queue::getting_value_depends_on(cl::mem_object& obj, const cl::event& evt)
-{
-    cl::access_storage store;
-    store.add(obj);
-
-    event_history.push_back({evt, store, "manual_depend"});
-}
-
-cl::event cl::managed_command_queue::exec(const std::string& kname, args& pack, const std::vector<size_t>& global_ws, const std::vector<size_t>& local_ws, const std::vector<event>& deps)
-{
-    cleanup_events();
-
-    std::vector<cl::event> prior_deps = get_implicit_dependencies(*this, pack.memory_objects);
-
-    prior_deps.insert(prior_deps.end(), deps.begin(), deps.end());
-
-    cl::command_queue& exec_on = mqueue.next();
-
-    cl::event my_event = exec_on.exec(kname, pack, global_ws, local_ws, prior_deps);
-    exec_on.flush();
-
-    event_history.push_back({my_event, pack.memory_objects, kname});
-
-    return my_event;
-}
-
-void cl::managed_command_queue::flush()
-{
-    for(cl::command_queue& q : mqueue.queues)
-    {
-        q.flush();
-    }
-}
-
-void cl::managed_command_queue::block()
-{
-    for(cl::command_queue& q : mqueue.queues)
-    {
-        q.block();
-    }
-}
-
-void cl::managed_command_queue::cleanup_events()
-{
-    for(int i=0; i < (int)event_history.size(); i++)
-    {
-        cl::event& test = std::get<0>(event_history[i]);
-
-        if(test.is_finished())
-        {
-            event_history.erase(event_history.begin() + i);
-            i--;
-            continue;
-        }
-    }
 }
 
 cl::event cl::command_queue::enqueue_marker(const std::vector<cl::event>& deps)
@@ -1715,24 +1524,6 @@ cl::event cl::gl_rendertexture::unacquire(cl::command_queue& cqueue)
     return unacquire(cqueue, {});
 }
 
-cl::event cl::gl_rendertexture::acquire(cl::managed_command_queue& mqueue, const std::vector<cl::event>& events)
-{
-    return mqueue.add([&](cl::command_queue& cqueue, const std::vector<cl::event>& full)
-    {
-        return acquire(cqueue, full);
-    },
-    *this, events);
-}
-
-cl::event cl::gl_rendertexture::unacquire(cl::managed_command_queue& mqueue, const std::vector<cl::event>& events)
-{
-    return mqueue.add([&](cl::command_queue& cqueue, const std::vector<cl::event>& full)
-    {
-        return unacquire(cqueue, full);
-    },
-    *this, events);
-}
-
 cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events)
 {
     cl::event evt;
@@ -1751,32 +1542,6 @@ cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& de
     }
 
     return evt;
-}
-
-cl::event cl::copy(cl::managed_command_queue& mqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events)
-{
-    mqueue.cleanup_events();
-
-    auto evts_1 = mqueue.get_dependencies(source);
-    auto evts_2 = mqueue.get_dependencies(dest);
-
-    std::vector<cl::event> all_events;
-
-    all_events.insert(all_events.end(), evts_1.begin(), evts_1.end());
-    all_events.insert(all_events.end(), evts_2.begin(), evts_2.end());
-    all_events.insert(all_events.end(), events.begin(), events.end());
-
-    cl::command_queue& exec_on = mqueue.mqueue.next();
-
-    cl::event next = cl::copy(exec_on, source, dest, all_events);
-
-    cl::access_storage store;
-    store.add(source);
-    store.add(dest);
-
-    mqueue.event_history.push_back({next, store, "copy"});
-
-    return next;
 }
 
 std::string cl::get_extensions(context& ctx)
