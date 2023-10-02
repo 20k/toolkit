@@ -4,11 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
-#ifndef FAST_CL
 #include <CL/cl.h>
-#else
-#include <libfastcl/fastcl/cl.h>
-#endif
 #include <memory>
 #include <GL/glew.h>
 #include <GL/gl.h>
