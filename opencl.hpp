@@ -274,12 +274,7 @@ namespace cl
         {
             auto [ptr, size] = get_ptr();
 
-            #ifdef FAST_CL
-            if constexpr(std::is_base_of_v<mem_object, T>)
-                clSetKernelArgMemEx(kern, idx, size, ptr);
-            else
-            #endif
-                clSetKernelArg(kern, idx, size, ptr);
+            clSetKernelArg(kern, idx, size, ptr);
         }
 
         std::pair<void*, size_t> get_ptr()
