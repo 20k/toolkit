@@ -230,8 +230,23 @@ void glfw_backend::init_screen(vec2i dim)
     if(dim.y() < 32)
         dim.y() = 32;
 
+    if(ctx.screens_init)
+    {
+        glDeleteTextures(1, &ctx.screen_tex);
+        glDeleteTextures(1, &ctx.screen_tex_srgb);
+
+        glDeleteFramebuffers(1, &ctx.fbo);
+        glDeleteFramebuffers(1, &ctx.fbo_srgb);
+
+        ctx.screen_tex = 0;
+        ctx.screen_tex_srgb = 0;
+        ctx.fbo = 0;
+        ctx.fbo_srgb = 0;
+    }
+
     make_fbo(&ctx.fbo, &ctx.screen_tex, dim, false);
     make_fbo(&ctx.fbo_srgb, &ctx.screen_tex_srgb, dim, true);
+    ctx.screens_init = true;
 
     #ifndef NO_OPENCL
     if(clctx)
@@ -529,6 +544,7 @@ void glfw_backend::resize(vec2i dim)
     last_size = dim;
 
     glfwSetWindowSize(ctx.window, last_size.x(), last_size.y());
+
     init_screen(dim);
 }
 

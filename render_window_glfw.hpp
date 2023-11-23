@@ -18,6 +18,7 @@ struct render_settings;
 
 struct glfw_render_context
 {
+    bool screens_init = false;
     unsigned int fbo;
     unsigned int screen_tex;
 
