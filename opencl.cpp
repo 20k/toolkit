@@ -516,6 +516,8 @@ struct async_setter
     }
 };
 
+static std::mutex build_mut;
+
 void cl::program::build(const context& ctx, const std::string& options)
 {
     std::string build_options = "-cl-single-precision-constant " + options;
@@ -531,7 +533,17 @@ void cl::program::build(const context& ctx, const std::string& options)
         if(async_ctx->cancelled)
             return;
 
-        cl_int build_err = clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
+        cl_int build_err = 0;
+
+        {
+            //serialise accesses to clbuildprogram
+            std::lock_guard lock(build_mut);
+
+            if(async_ctx->cancelled)
+                return;
+
+            build_err = clBuildProgram(prog.data, 1, &selected, build_options.c_str(), nullptr, nullptr);
+        }
 
         if(build_err != CL_SUCCESS && build_err != CL_BUILD_PROGRAM_FAILURE)
         {
