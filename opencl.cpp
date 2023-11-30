@@ -14,6 +14,7 @@
 #include <thread>
 #include "clock.hpp"
 #include <mutex>
+#include <toolkit/fs_helpers.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -452,7 +453,7 @@ cl::program::program(const context& ctx, const std::string& binary_data, cl::pro
     native_program.data = clCreateProgramWithBinary(ctx.native_context.data, 1, &selected_device, &length, (const unsigned char**)&binary_data_ptr, nullptr, nullptr);
 }
 
-std::string cl::program::get_binary()
+std::string get_binary(const cl::base<cl_program, clRetainProgram, clReleaseProgram>& native_program)
 {
     size_t sizes[1] = {0};
     clGetProgramInfo(native_program.data, CL_PROGRAM_BINARY_SIZES, 1 * sizeof(size_t), sizes, NULL);
@@ -465,6 +466,11 @@ std::string cl::program::get_binary()
     clGetProgramInfo(native_program.data, CL_PROGRAM_BINARIES, 1 * sizeof(char*), &binary_ptr, NULL);
 
     return binary;
+}
+
+std::string cl::program::get_binary()
+{
+    return ::get_binary(native_program);
 }
 
 void debug_build_status(cl_program prog, cl_device_id selected_device)
@@ -525,8 +531,10 @@ void cl::program::build(const context& ctx, const std::string& options)
     auto prog = native_program;
     cl_device_id selected = selected_device;
     std::shared_ptr<async_context> async_ctx = async;
+    bool cache_write = must_write_to_cache_when_built;
+    std::string cache_name = name_in_cache;
 
-    std::thread([prog, selected, build_options, async_ctx, options]()
+    std::thread([prog, selected, build_options, async_ctx, options, cache_write, cache_name]()
     {
         async_setter sett(async_ctx);
 
@@ -595,6 +603,11 @@ void cl::program::build(const context& ctx, const std::string& options)
 
             which[k1.name] = k1;
         }
+
+        if(cache_write)
+        {
+            file::write("cache/" + cache_name, ::get_binary(prog), file::mode::BINARY);
+        }
     }).detach();
 }
 
@@ -611,6 +624,101 @@ bool cl::program::is_built()
 void cl::program::cancel()
 {
     async->cancelled = true;
+}
+
+namespace{
+template<typename T>
+void hash_combine(std::size_t& seed, const T& v)
+{
+    std::hash<T> hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+}
+
+cl::program cl::build_program_with_cache(const context& ctx, const std::vector<std::string>& data, bool is_file, const std::string& options, const std::vector<std::string>& extra_deps, const std::string& cache_name)
+{
+    assert(data.size() > 0);
+
+    std::vector<std::string> file_data;
+
+    if(is_file)
+    {
+        for(auto& i : data)
+        {
+            file_data.push_back(file::read(i, file::mode::BINARY));
+        }
+    }
+    else
+    {
+        file_data = data;
+    }
+
+    std::vector<std::string> deps_file_data;
+
+    for(const auto& name : extra_deps)
+    {
+        deps_file_data.push_back(file::read(name, file::mode::BINARY));
+    }
+
+    std::optional<cl::program> prog_opt;
+
+    std::size_t hsh = 0;
+
+    hash_combine(hsh, options);
+
+    for(auto& i : file_data)
+        hash_combine(hsh, i);
+
+    for(const auto& file : deps_file_data)
+        hash_combine(hsh, file);
+
+    file::mkdir("cache");
+
+    std::string filename;
+
+    if(is_file)
+    {
+        for(auto& i : data)
+            filename += i + "_";
+    }
+    else
+    {
+        filename = "";
+    }
+
+    std::string name_in_cache = filename + std::to_string(hsh);
+
+    if(cache_name != "")
+    {
+        name_in_cache = cache_name + "_" + std::to_string(hsh);
+    }
+
+    if(file::exists("cache/" + name_in_cache))
+    {
+        std::string bin = file::read("cache/" + name_in_cache, file::mode::BINARY);
+
+        prog_opt.emplace(ctx, bin, cl::program::binary_tag{});
+    }
+    else
+    {
+        prog_opt.emplace(ctx, file_data, false);
+        prog_opt.value().must_write_to_cache_when_built = true;
+        prog_opt.value().name_in_cache = name_in_cache;
+    }
+
+    cl::program& t_program = prog_opt.value();
+
+    try
+    {
+        t_program.build(ctx, options);
+    }
+    catch(...)
+    {
+        std::cout << "Error building " << filename << std::endl;
+        throw;
+    }
+
+    return t_program;
 }
 
 cl_mem_flags cl::mem_object::get_flags()

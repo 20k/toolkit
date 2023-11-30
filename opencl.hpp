@@ -345,6 +345,8 @@ namespace cl
 
         base<cl_program, clRetainProgram, clReleaseProgram> native_program;
         std::shared_ptr<async_context> async;
+        bool must_write_to_cache_when_built = false;
+        std::string name_in_cache;
 
         program(const context& ctx);
         program(const context& ctx, const std::string& data, bool is_file = true);
@@ -358,6 +360,8 @@ namespace cl
         bool is_built();
         void cancel(); ///purely optional
     };
+
+    program build_program_with_cache(const context& ctx, const std::vector<std::string>& data, bool is_file = true, const std::string& options = "", const std::vector<std::string>& extra_deps = {}, const std::string& cache_name = "");
 
     struct kernel
     {
