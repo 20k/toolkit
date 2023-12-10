@@ -519,7 +519,10 @@ void render_window::render(const std::vector<vertex>& vertices, texture* tex)
         idl->PushTextureID(ImGui::GetIO().Fonts->TexID);
     }
 
-    vec2i window_pos = get_window_position();
+    vec2i window_pos;
+
+    if(settings.viewports)
+        window_pos = get_window_position();
 
     idl->PrimReserve(vertices.size(), vertices.size());
     ImDrawVert* vtx_write = idl->_VtxWritePtr;
