@@ -835,21 +835,21 @@ namespace cl
     event copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& dest, const std::vector<cl::event>& events = {});
 
     template<typename T, typename U>
-    void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec3i origin, vec3i region)
+    void copy_image(cl::command_queue& cqueue, T& src, U& dst, vec3i origin, vec3i region)
     {
-        size_t src[3] = {(int)origin.x(), (int)origin.y(), (int)origin.z()};
+        size_t origin_arr[3] = {(int)origin.x(), (int)origin.y(), (int)origin.z()};
         size_t iregion[3] = {(int)region.x(), (int)region.y(), (int)region.z()};
 
-        clEnqueueCopyImage(cqueue.native_command_queue.data, i1.native_mem_object.data, i2.native_mem_object.data, src, src, iregion, 0, nullptr, nullptr);
+        clEnqueueCopyImage(cqueue.native_command_queue.data, src.native_mem_object.data, dst.native_mem_object.data, origin_arr, origin_arr, iregion, 0, nullptr, nullptr);
     }
 
     template<typename T, typename U>
-    void copy_image(cl::command_queue& cqueue, T& i1, U& i2, vec2i origin, vec2i region)
+    void copy_image(cl::command_queue& cqueue, T& src, U& dst, vec2i origin, vec2i region)
     {
-        size_t src[3] = {(int)origin.x(), (int)origin.y(), 0};
+        size_t origin_arr[3] = {(int)origin.x(), (int)origin.y(), 0};
         size_t iregion[3] = {(int)region.x(), (int)region.y(), 1};
 
-        clEnqueueCopyImage(cqueue.native_command_queue.data, i1.native_mem_object.data, i2.native_mem_object.data, src, src, iregion, 0, nullptr, nullptr);
+        clEnqueueCopyImage(cqueue.native_command_queue.data, src.native_mem_object.data, dst.native_mem_object.data, origin_arr, origin_arr, iregion, 0, nullptr, nullptr);
     }
 
     std::string get_extensions(context& ctx);
