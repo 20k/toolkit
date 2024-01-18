@@ -482,6 +482,15 @@ namespace cl
 
         event write_async(command_queue& write_on, const char* ptr, int64_t bytes);
 
+        template<typename T>
+        event write_async(command_queue& write_on, std::span<T> data)
+        {
+            if(data.size() == 0)
+                return event();
+
+            return write_async(write_on, (const char*)data.data(), data.size() * sizeof(T));
+        }
+
         void read(command_queue& read_on, char* ptr, int64_t bytes);
         void read(command_queue& read_on, char* ptr, int64_t bytes, int64_t offset);
 
