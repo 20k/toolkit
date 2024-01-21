@@ -104,6 +104,9 @@ std::vector<cl_event> to_raw_events(const std::vector<cl::event>& events)
 
     for(const cl::event& e : events)
     {
+        if(e.native_event.data == nullptr)
+            continue;
+
         ret.push_back(e.native_event.data);
     }
 
