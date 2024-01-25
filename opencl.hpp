@@ -853,12 +853,16 @@ namespace cl
     }
 
     template<typename T, typename U>
-    void copy_image(cl::command_queue& cqueue, T& src, U& dst, vec2i origin, vec2i region)
+    cl::event copy_image(cl::command_queue& cqueue, T& src, U& dst, vec2i origin, vec2i region)
     {
         size_t origin_arr[3] = {(int)origin.x(), (int)origin.y(), 0};
         size_t iregion[3] = {(int)region.x(), (int)region.y(), 1};
 
-        clEnqueueCopyImage(cqueue.native_command_queue.data, src.native_mem_object.data, dst.native_mem_object.data, origin_arr, origin_arr, iregion, 0, nullptr, nullptr);
+        cl::event ret;
+
+        clEnqueueCopyImage(cqueue.native_command_queue.data, src.native_mem_object.data, dst.native_mem_object.data, origin_arr, origin_arr, iregion, 0, nullptr, &ret.native_event.data);
+
+        return ret;
     }
 
     std::string get_extensions(context& ctx);
