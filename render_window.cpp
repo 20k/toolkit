@@ -200,6 +200,7 @@ std::vector<dropped_file> emscripten_drag_drop::get_dropped_files()
 ///just realised a much faster version of this
 ///unconditionally blur whole screen, then only clip bits we want
 #ifndef NO_OPENCL
+#ifndef NO_OPENCL_SCREEN
 void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
 {
     std::vector<frostable> frosty = win.get_frostables();
@@ -248,6 +249,7 @@ void blur_buffer(render_window& win, cl::gl_rendertexture& tex)
     tex.unacquire(win.clctx->cqueue);
     win.clctx->cqueue.block();
 }
+#endif
 #endif // NO_OPENCL
 
 void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
@@ -257,7 +259,9 @@ void post_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
     assert(win->clctx);
 
     #ifndef NO_OPENCL
+    #ifndef NO_OPENCL_SCREEN
     blur_buffer(*win, win->clctx->cl_screen_tex);
+    #endif
     #endif // NO_OPENCL
 }
 
@@ -340,7 +344,11 @@ void imtui_backend::close()
 #endif // USE_IMTUI
 
 #ifndef NO_OPENCL
-opencl_context::opencl_context() : ctx(), cl_screen_tex(ctx), cqueue(ctx), cl_image(ctx)
+opencl_context::opencl_context() : ctx(),
+#ifndef NO_OPENCL_SCREEN
+    cl_screen_tex(ctx), cl_image(ctx),
+#endif
+    cqueue(ctx)
 {
 
 }

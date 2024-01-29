@@ -61,9 +61,11 @@ struct opencl_context
 struct opencl_context
 {
     cl::context ctx;
+    #ifndef NO_OPENCL_SCREEN
     cl::gl_rendertexture cl_screen_tex;
-    cl::command_queue cqueue;
     cl::image cl_image;
+    #endif
+    cl::command_queue cqueue;
 
     opencl_context();
 };

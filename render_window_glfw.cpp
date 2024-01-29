@@ -249,11 +249,13 @@ void glfw_backend::init_screen(vec2i dim)
     ctx.screens_init = true;
 
     #ifndef NO_OPENCL
+    #ifndef NO_OPENCL_SCREEN
     if(clctx)
     {
         clctx->cl_screen_tex.create_from_texture(ctx.screen_tex);
         clctx->cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
     }
+    #endif
     #endif // NO_OPENCL
 }
 
