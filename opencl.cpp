@@ -675,6 +675,10 @@ cl::program cl::build_program_with_cache(const context& ctx, const std::vector<s
 
     hash_combine(hsh, ctx.platform_name);
 
+    auto d_name_as_vec = get_device_info(ctx.selected_device, CL_DEVICE_NAME);
+
+    hash_combine(hsh, std::string(d_name_as_vec.begin(), d_name_as_vec.end()));
+
     file::mkdir("cache");
 
     std::string filename;
