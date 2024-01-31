@@ -48,52 +48,50 @@ bool file_exists(const std::string& file_name)
 }
 
 static
-void get_platform_ids(cl_platform_id* clSelectedPlatformID)
+std::string get_platform_name(cl_platform_id id)
+{
+    std::string val;
+    val.resize(1024);
+    assert(clGetPlatformInfo(id, CL_PLATFORM_NAME, 1024, val.data(), NULL) == CL_SUCCESS);
+    return val;
+}
+
+static
+cl_platform_id get_platform_ids()
 {
     char chBuffer[1024] = {};
-    cl_uint num_platforms;
-    std::vector<cl_platform_id> clPlatformIDs;
-    cl_int ciErrNum;
-    *clSelectedPlatformID = NULL;
-    cl_uint i = 0;
 
-    ciErrNum = clGetPlatformIDs(0, NULL, &num_platforms);
+    std::optional<cl_platform_id> ret;
+
+    cl_uint num_platforms = 0;
+    cl_int ciErrNum = clGetPlatformIDs(0, NULL, &num_platforms);
 
     if(ciErrNum != CL_SUCCESS)
-    {
         throw std::runtime_error("Bad clGetPlatformIDs call " + std::to_string(ciErrNum));
-    }
-    else
+
+    if(num_platforms == 0)
+        throw std::runtime_error("No available platforms");
+
+    std::vector<cl_platform_id> clPlatformIDs;
+    clPlatformIDs.resize(num_platforms);
+
+    assert(clGetPlatformIDs(num_platforms, &clPlatformIDs[0], NULL) == CL_SUCCESS);
+
+    for(int i = 0; i < num_platforms; i++)
     {
-        if(num_platforms == 0)
-        {
-            throw std::runtime_error("No available platforms");
-        }
-        else
-        {
-            clPlatformIDs.resize(num_platforms);
+        std::string name = get_platform_name(clPlatformIDs[i]);
 
-            ciErrNum = clGetPlatformIDs(num_platforms, &clPlatformIDs[0], NULL);
-
-            for(i = 0; i < num_platforms; i++)
-            {
-                ciErrNum = clGetPlatformInfo(clPlatformIDs[i], CL_PLATFORM_NAME, 1024, &chBuffer, NULL);
-
-                if(ciErrNum == CL_SUCCESS)
-                {
-                    if(strstr(chBuffer, "NVIDIA") != NULL || strstr(chBuffer, "AMD") != NULL)// || strstr(chBuffer, "Intel") != NULL)
-                    {
-                        *clSelectedPlatformID = clPlatformIDs[i];
-                    }
-                }
-            }
-
-            if(*clSelectedPlatformID == NULL)
-            {
-                *clSelectedPlatformID = clPlatformIDs[num_platforms-1];
-            }
-        }
+        if(name.contains("NVIDIA") || name.contains("AMD"))
+            ret = clPlatformIDs[i];
     }
+
+    if(!ret.has_value())
+        ret = clPlatformIDs[num_platforms-1];
+
+    if(!ret.has_value())
+        throw std::runtime_error("Did not find platform");
+
+    return ret.value();
 }
 
 namespace
@@ -238,8 +236,8 @@ cl::context::context()
 {
     shared = std::make_shared<shared_kernel_info>();
 
-    cl_platform_id pid = {};
-    get_platform_ids(&pid);
+    cl_platform_id pid = get_platform_ids();
+    platform_name = get_platform_name(pid);
 
     cl_uint num_devices = 0;
     cl_device_id devices[100] = {};
@@ -674,6 +672,8 @@ cl::program cl::build_program_with_cache(const context& ctx, const std::vector<s
 
     for(const auto& file : deps_file_data)
         hash_combine(hsh, file);
+
+    hash_combine(hsh, ctx.platform_name);
 
     file::mkdir("cache");
 

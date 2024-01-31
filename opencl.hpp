@@ -409,6 +409,7 @@ namespace cl
     {
         std::shared_ptr<shared_kernel_info> shared;
         cl_device_id selected_device;
+        std::string platform_name;
 
         base<cl_context, clRetainContext, clReleaseContext> native_context;
 
