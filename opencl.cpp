@@ -22,7 +22,7 @@
 #include <GL/glx.h>
 #endif
 
-#define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {printf("Got opencl error %i\n", err); throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
+#define CHECK(x) do{if(auto err = x; err != CL_SUCCESS) {printf("Got opencl error %i %s\n", err, #x); throw std::runtime_error("Got error " + std::to_string(err));}}while(0)
 
 static
 std::string read_file(const std::string& file)
@@ -51,16 +51,20 @@ static
 std::string get_platform_name(cl_platform_id id)
 {
     std::string val;
-    val.resize(1024);
-    assert(clGetPlatformInfo(id, CL_PLATFORM_NAME, 1024, val.data(), NULL) == CL_SUCCESS);
+
+    size_t length = 0;
+
+    CHECK(clGetPlatformInfo(id, CL_PLATFORM_NAME, 0, nullptr, &length));
+
+    val.resize(length + 1);
+
+    CHECK(clGetPlatformInfo(id, CL_PLATFORM_NAME, length, (void*)val.data(), NULL));
     return val;
 }
 
 static
 cl_platform_id get_platform_ids()
 {
-    char chBuffer[1024] = {};
-
     std::optional<cl_platform_id> ret;
 
     cl_uint num_platforms = 0;
@@ -75,7 +79,7 @@ cl_platform_id get_platform_ids()
     std::vector<cl_platform_id> clPlatformIDs;
     clPlatformIDs.resize(num_platforms);
 
-    assert(clGetPlatformIDs(num_platforms, &clPlatformIDs[0], NULL) == CL_SUCCESS);
+    CHECK(clGetPlatformIDs(num_platforms, &clPlatformIDs[0], NULL));
 
     for(int i = 0; i < num_platforms; i++)
     {
