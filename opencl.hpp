@@ -147,6 +147,15 @@ namespace cl
         }
     };
 
+    struct local_memory
+    {
+        size_t size = 0;
+
+        local_memory(size_t in) : size(in)
+        {
+        }
+    };
+
     #define DECLARE_VECTOR_OPENCL_TYPE(real_type, cl_type) \
         inline cl_type type_to_opencl(real_type v){return v;} \
         inline cl_type##2 type_to_opencl(cl_type##2 v){return v;} \
@@ -173,6 +182,9 @@ namespace cl
     inline
     cl_command_queue type_to_opencl(cl_command_queue v){return v;}
 
+    inline
+    size_t type_to_opencl(const local_memory& v){return v.size;}
+
     template<typename T, std::size_t N>
     inline
     auto to_opencl_from_array(std::array<T, N> raw)
@@ -186,7 +198,6 @@ namespace cl
             return cl_type##2{raw[0], raw[1]}; \
         if constexpr(std::is_same_v<T, real_type> && N == 1) \
             return cl_type{raw[0]};
-
 
         if constexpr (N == 1)
             return type_to_opencl(raw[0]);
@@ -282,6 +293,10 @@ namespace cl
             else if constexpr(std::is_base_of_v<mem_object, T>)
             {
                 return {&this->t.native_mem_object.data, sizeof(cl_mem)};
+            }
+            else if constexpr(std::is_base_of_v<local_memory, T>)
+            {
+                return {nullptr, t.size};
             }
             else
             {
