@@ -81,7 +81,7 @@ cl_platform_id get_platform_ids()
 
     CHECK(clGetPlatformIDs(num_platforms, &clPlatformIDs[0], NULL));
 
-    for(int i = 0; i < num_platforms; i++)
+    for(int i = 0; i < (int)num_platforms; i++)
     {
         std::string name = get_platform_name(clPlatformIDs[i]);
 
@@ -950,7 +950,7 @@ namespace
         cl::buffer ret = in;
 
         assert(region.origin >= 0);
-        assert(region.origin + region.size <= in.alloc_size);
+        assert(region.origin + region.size <= (size_t)in.alloc_size);
 
         cl_int err = 0;
         cl_mem as_subobject = clCreateSubBuffer(in.native_mem_object.data, flags, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);

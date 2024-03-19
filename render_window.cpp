@@ -464,13 +464,6 @@ void render_window::set_srgb(bool enabled)
     #endif // USE_IMTUI
 }
 
-void pre_render(const ImDrawList* parent_list, const ImDrawCmd* cmd)
-{
-    render_window* win = (render_window*)cmd->UserCallbackData;
-
-    //glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER, win->rctx.background_fbo);
-}
-
 #ifndef USE_IMTUI
 std::vector<frostable> render_window::get_frostables()
 {
@@ -532,7 +525,7 @@ void render_window::render(const std::vector<vertex>& vertices, texture* tex)
     if(settings.viewports)
         window_pos = get_window_position();
 
-    idl->PrimReserve(vertices.size(), vertices.size());
+    idl->PrimReserve((int)vertices.size(), (int)vertices.size());
     ImDrawVert* vtx_write = idl->_VtxWritePtr;
     ImDrawIdx* idx_write = idl->_IdxWritePtr;
     unsigned int vtx_current_idx = idl->_VtxCurrentIdx;

@@ -38,7 +38,9 @@ EM_JS(void, syncer, (),
 namespace
 {
     thread_local int syncs{0};
+    #ifdef __EMSCRIPTEN__
     thread_local bool syncs_dirty = false;
+    #endif
 }
 
 void sync_writes()
