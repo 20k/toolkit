@@ -15,6 +15,7 @@
 #include "clock.hpp"
 #include <mutex>
 #include <toolkit/fs_helpers.hpp>
+#include <semaphore>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -475,6 +476,8 @@ std::string get_binary(const cl::base<cl_program, clRetainProgram, clReleaseProg
 
 std::string cl::program::get_binary()
 {
+    ensure_built();
+
     return ::get_binary(native_program);
 }
 
@@ -527,7 +530,20 @@ struct async_setter
     }
 };
 
-static std::mutex build_mut;
+static std::counting_semaphore semaphore(std::max(std::thread::hardware_concurrency(), 1u));
+
+struct semaphore_manager
+{
+    semaphore_manager()
+    {
+        semaphore.acquire();
+    }
+
+    ~semaphore_manager()
+    {
+        semaphore.release();
+    }
+};
 
 void cl::program::build(const context& ctx, const std::string& options)
 {
@@ -539,7 +555,7 @@ void cl::program::build(const context& ctx, const std::string& options)
     bool cache_write = must_write_to_cache_when_built;
     std::string cache_name = name_in_cache;
 
-    std::thread([prog, selected, build_options, async_ctx, options, cache_write, cache_name]()
+    std::thread([prog, selected, build_options, async_ctx, options, cache_write, cache_name, semaphore]()
     {
         async_setter sett(async_ctx);
 
@@ -549,8 +565,8 @@ void cl::program::build(const context& ctx, const std::string& options)
         cl_int build_err = 0;
 
         {
-            //serialise accesses to clbuildprogram
-            std::lock_guard lock(build_mut);
+            ///serialise access to clbuildprogram
+            semaphore_manager lock;
 
             if(async_ctx->cancelled)
                 return;
