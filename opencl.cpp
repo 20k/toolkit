@@ -555,7 +555,7 @@ void cl::program::build(const context& ctx, const std::string& options)
     bool cache_write = must_write_to_cache_when_built;
     std::string cache_name = name_in_cache;
 
-    std::thread([prog, selected, build_options, async_ctx, options, cache_write, cache_name, semaphore]()
+    std::thread([prog, selected, build_options, async_ctx, options, cache_write, cache_name]()
     {
         async_setter sett(async_ctx);
 
