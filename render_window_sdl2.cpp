@@ -11,7 +11,7 @@
 #include <map>
 #include <iostream>
 #include <toolkit/fs_helpers.hpp>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include "clock.hpp"
 
 #ifdef __EMSCRIPTEN__
@@ -218,11 +218,13 @@ void sdl2_backend::init_screen(vec2i dim)
     make_fbo(&ctx.fbo_srgb, &ctx.screen_tex_srgb, dim, true);
 
     #ifndef NO_OPENCL
+    #ifndef NO_OPENCL_SCREEN
     if(clctx)
     {
         clctx->cl_screen_tex.create_from_texture(ctx.screen_tex);
         clctx->cl_image.alloc(dim, cl_image_format{CL_RGBA, CL_FLOAT});
     }
+    #endif
     #endif // NO_OPENCL
 }
 

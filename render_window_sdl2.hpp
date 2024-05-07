@@ -2,7 +2,7 @@
 #define RENDER_WINDOW_SDL2_HPP_INCLUDED
 
 #include "render_window.hpp"
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 struct sdl2_render_context
 {
