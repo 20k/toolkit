@@ -530,7 +530,14 @@ struct async_setter
     }
 };
 
-static std::counting_semaphore semaphore(std::max(std::thread::hardware_concurrency(), 1u));
+int max_build_threads()
+{
+    ///it seems like amd's drivers don't let you invoke multiple builds that really build in parallel
+    ///so this is more of a safety check in case A: nvidia/intel do, or B: amd up their game
+    return std::min(std::max(std::thread::hardware_concurrency(), 1u), 3u);
+}
+
+static std::counting_semaphore semaphore(max_build_threads());
 
 struct semaphore_manager
 {
