@@ -478,22 +478,22 @@ namespace cl
         buffer(cl::context& ctx);
 
         void alloc(int64_t bytes);
-        void write(command_queue& write_on, const char* ptr, int64_t bytes, int64_t offset);
-        void write(command_queue& write_on, const char* ptr, int64_t bytes);
+        cl::event write(command_queue& write_on, const char* ptr, int64_t bytes, int64_t offset);
+        cl::event write(command_queue& write_on, const char* ptr, int64_t bytes);
 
         template<typename T>
-        void write(command_queue& write_on, const std::vector<T>& data)
+        cl::event write(command_queue& write_on, const std::vector<T>& data)
         {
             return write(write_on, std::span{data});
         }
 
         template<typename T>
-        void write(command_queue& write_on, std::span<T> data)
+        cl::event write(command_queue& write_on, std::span<T> data)
         {
             if(data.size() == 0)
-                return;
+                return cl::event();
 
-            write(write_on, (const char*)data.data(), data.size() * sizeof(T));
+            return write(write_on, (const char*)data.data(), data.size() * sizeof(T));
         }
 
         event write_async(command_queue& write_on, const char* ptr, int64_t bytes);
@@ -519,7 +519,7 @@ namespace cl
         event read_async(command_queue& read_on, char* ptr, int64_t bytes, const std::vector<cl::event>& wait_on);
 
         template<typename T>
-        read_info<T> read_async(command_queue& read_on, int64_t elements)
+        read_info<T> read_async(command_queue& read_on, int64_t elements, const std::vector<cl::event>& deps = std::vector<cl::event>())
         {
             read_info<T> ret;
 
@@ -529,7 +529,7 @@ namespace cl
             assert(elements * sizeof(T) <= alloc_size);
 
             ret.data = new T[elements];
-            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T), {});
+            ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T), deps);
 
             return ret;
         }
