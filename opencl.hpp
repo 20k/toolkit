@@ -269,13 +269,21 @@ namespace cl
     };
 
     template<typename T>
+    inline
+    auto fetch_array_type(T&& in)
+    {
+        using namespace cl_adl;
+
+        return type_to_array(std::forward<T>(in));
+    }
+
+    template<typename T>
     struct callback_helper_generic : callback_helper_base
     {
         T t;
-        decltype(to_opencl_from_array(cl_adl::type_to_array(std::declval<T>()))) native_type;
+        decltype(to_opencl_from_array(fetch_array_type(std::declval<T>()))) native_type;
 
-        callback_helper_generic(T&& in) : t(std::move(in)){native_type = to_opencl_from_array(cl_adl::type_to_array(t));}
-        callback_helper_generic(const T& in) : t(in){native_type = to_opencl_from_array(cl_adl::type_to_array(t));}
+        callback_helper_generic(T in) : t(std::move(in)){native_type = to_opencl_from_array(fetch_array_type(t));}
 
         void callback(cl_kernel kern, int idx) override
         {
@@ -302,7 +310,7 @@ namespace cl
             {
                 static_assert(std::is_trivially_copyable_v<T>);
 
-                return {&this->t, sizeof(T)};
+                return {&this->native_type, sizeof(native_type)};
             }
         }
     };
@@ -782,8 +790,8 @@ namespace cl
         template<typename T>
         event exec(const std::string& kname, args& pack, const T& global_ws, const T& local_ws, const std::vector<event>& deps = {})
         {
-            auto global_as_array = cl_adl::type_to_array(global_ws);
-            auto local_as_array = cl_adl::type_to_array(local_ws);
+            auto global_as_array = fetch_array_type(global_ws);
+            auto local_as_array = fetch_array_type(local_ws);
 
             std::vector<size_t> global_as_vec = detail::array_to_vec(global_as_array);
             std::vector<size_t> local_as_vec = detail::array_to_vec(local_as_array);
