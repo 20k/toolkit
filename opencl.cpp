@@ -393,6 +393,36 @@ void cl::context::remove_kernel(std::string_view name)
     }
 }
 
+void cl::async_build_and_cache(cl::context ctx, std::function<std::string(void)> func, std::vector<std::string> produces, std::string options)
+{
+    std::thread([=] mutable {
+        std::vector<std::shared_ptr<cl::pending_kernel>> pending;
+
+        for(auto& i : produces)
+        {
+            pending.push_back(std::make_shared<cl::pending_kernel>());
+        }
+
+        for(int i=0; i < (int)produces.size(); i++)
+        {
+            ctx.register_kernel(pending[i], produces[i]);
+        }
+
+        cl::program prog = cl::build_program_with_cache(ctx, {func()}, false, options);
+
+        prog.ensure_built();
+
+        for(int i=0; i < (int)pending.size(); i++)
+        {
+            pending[i]->kernel = prog.async->built_kernels.at(produces[i]);
+
+            pending[i]->latch.count_down();
+        }
+
+        ctx.register_program(prog);
+    }).detach();
+}
+
 cl::program::program(const context& ctx)
 {
     selected_device = ctx.selected_device;
@@ -805,7 +835,7 @@ cl_mem_flags cl::get_flags(const cl::mem_object& in)
     return false;
 }*/
 
-std::pair<cl::mem_object, cl_mem_flags> get_barrier_vars(const cl::mem_object& in);
+/*std::pair<cl::mem_object, cl_mem_flags> get_barrier_vars(const cl::mem_object& in);
 
 void cl::access_storage::add(const cl::mem_object& in)
 {
@@ -833,7 +863,7 @@ std::pair<cl::mem_object, cl_mem_flags> get_barrier_vars(const cl::mem_object& i
     cl_mem_flags flags = cl::get_flags(in);
 
     return {parent.value_or(in), flags};
-}
+}*/
 
 cl::buffer::buffer(cl::context& ctx)
 {

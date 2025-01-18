@@ -249,12 +249,12 @@ namespace cl
         return o1.native_mem_object.data < o2.native_mem_object.data;
     }
 
-    struct access_storage
+    /*struct access_storage
     {
         std::map<mem_object, std::vector<cl_mem_flags>> store;
 
         void add(const mem_object& in);
-    };
+    };*/
 
     struct kernel;
 
@@ -440,6 +440,7 @@ namespace cl
         explicit context(bool); ///defer context creation
 
         void register_program(program& p);
+        //void register_program(program& p, const std::vector<std::string>& provides_kernels);
         void deregister_program(int idx);
 
         void register_kernel(const cl::kernel& kern, std::optional<std::string> name_override = std::nullopt, bool can_overlap_existing = false);
@@ -448,6 +449,8 @@ namespace cl
         kernel fetch_kernel(std::string_view name);
         void remove_kernel(std::string_view name);
     };
+
+    void async_build_and_cache(cl::context ctx, std::function<std::string(void)> func, std::vector<std::string> produces_kernels, std::string options = "");
 
     struct command_queue;
 
