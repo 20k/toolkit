@@ -204,7 +204,8 @@ cl::kernel::kernel(cl_kernel k)
 void cl::kernel::set_args(cl::args& pack)
 {
     if((int)pack.arg_list.size() != argument_count)
-        throw std::runtime_error("Called kernel " + name + " with wrong number of arguments");
+        throw std::runtime_error("Called kernel " + name + " with wrong number of arguments (Passed " +
+                                 std::to_string(pack.arg_list.size()) + ", Expected " + std::to_string(argument_count) + ")");
 
     for(int i=0; i < (int)pack.arg_list.size(); i++)
     {
