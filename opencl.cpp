@@ -771,6 +771,21 @@ cl::program cl::build_program_with_cache(const context& ctx, const std::vector<s
         prog_opt.value().name_in_cache = name_in_cache;
     }
 
+    if(!is_file && file_data.size() == 1)
+    {
+        file::mkdir("generated");
+
+        std::string full_name = "generated/" + name_in_cache + ".cl";
+
+        bool should_update = true;
+
+        if(file::exists(full_name) && file::read(full_name, file::mode::TEXT) == file_data[0])
+            should_update = false;
+
+        if(should_update)
+            file::write(full_name, file_data[0], file::mode::TEXT);
+    }
+
     cl::program& t_program = prog_opt.value();
 
     try
