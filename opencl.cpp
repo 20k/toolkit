@@ -512,21 +512,21 @@ std::string cl::program::get_binary()
     return ::get_binary(native_program);
 }
 
-void debug_build_status(cl_program prog, cl_device_id selected_device)
+void debug_build_status(cl_program prog, cl_device_id selected_device, const std::string& name)
 {
     cl_build_status bstatus = CL_BUILD_ERROR;
     cl_int build_info_result = clGetProgramBuildInfo(prog, selected_device, CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &bstatus, nullptr);
 
     if(build_info_result != CL_SUCCESS)
     {
-        std::cout << "Error in clGetProgramBuildInfo " << build_info_result << std::endl;
+        std::cout << "Error in clGetProgramBuildInfo " << build_info_result << " for " << name << std::endl;
         return;
     }
 
     if(bstatus == CL_SUCCESS)
         return;
 
-    std::cout << "Build Status: " << bstatus << std::endl;
+    std::cout << "Build Status: " << bstatus << " for " << name << std::endl;
 
     assert(bstatus == CL_BUILD_ERROR);
 
@@ -546,7 +546,7 @@ void debug_build_status(cl_program prog, cl_device_id selected_device)
 
 void debug_build_status(cl::program& prog)
 {
-    debug_build_status(prog.native_program.data, prog.selected_device);
+    debug_build_status(prog.native_program.data, prog.selected_device, "");
 }
 
 struct async_setter
@@ -626,7 +626,7 @@ void cl::program::build(const context& ctx, const std::string& options)
         if(async_ctx->cancelled)
             return;
 
-        debug_build_status(prog.data, selected);
+        debug_build_status(prog.data, selected, cache_name);
 
         cl_uint num = 0;
         cl_int err = clCreateKernelsInProgram(prog.data, 0, nullptr, &num);
