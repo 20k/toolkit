@@ -1736,6 +1736,9 @@ cl::event cl::copy(cl::command_queue& cqueue, cl::buffer& source, cl::buffer& de
 
     size_t amount = std::min(source.alloc_size, dest.alloc_size);
 
+    if(amount == 0)
+        return evt;
+
     std::vector<cl_event> raw_events = to_raw_events(events);
 
     cl_int err = clEnqueueCopyBuffer(cqueue.native_command_queue.data, source.native_mem_object.data, dest.native_mem_object.data, 0, 0, amount, raw_events.size(), raw_events.data(), &evt.native_event.data);
