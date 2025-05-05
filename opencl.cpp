@@ -1003,13 +1003,16 @@ cl::event cl::buffer::fill(cl::command_queue& write_on, const void* pattern, siz
 {
     cl::event evt;
 
+    if(size == 0)
+        return evt;
+
     std::vector<cl_event> events = to_raw_events(deps);
 
     cl_int val = clEnqueueFillBuffer(write_on.native_command_queue.data, native_mem_object.data, pattern, pattern_size, 0, size, events.size(), events.data(), &evt.native_event.data);
 
     if(val != CL_SUCCESS)
     {
-        throw std::runtime_error("Could not fill buffer");
+        throw std::runtime_error("Could not fill buffer " + std::to_string(val));
     }
 
     return evt;
