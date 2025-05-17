@@ -396,19 +396,19 @@ void cl::context::remove_kernel(std::string_view name)
 
 void cl::async_build_and_cache(cl::context ctx, std::function<std::string(void)> func, std::vector<std::string> produces, std::string options)
 {
+    std::vector<std::shared_ptr<cl::pending_kernel>> pending;
+
+    for(auto& i : produces)
+    {
+        pending.push_back(std::make_shared<cl::pending_kernel>());
+    }
+
+    for(int i=0; i < (int)produces.size(); i++)
+    {
+        ctx.register_kernel(pending[i], produces[i]);
+    }
+
     std::thread([=] mutable {
-        std::vector<std::shared_ptr<cl::pending_kernel>> pending;
-
-        for(auto& i : produces)
-        {
-            pending.push_back(std::make_shared<cl::pending_kernel>());
-        }
-
-        for(int i=0; i < (int)produces.size(); i++)
-        {
-            ctx.register_kernel(pending[i], produces[i]);
-        }
-
         cl::program prog = cl::build_program_with_cache(ctx, {func()}, false, options);
 
         prog.ensure_built();
