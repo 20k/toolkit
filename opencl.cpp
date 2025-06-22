@@ -408,9 +408,8 @@ void cl::async_build_and_cache(cl::context ctx, std::function<std::string(void)>
         ctx.register_kernel(pending[i], produces[i]);
     }
 
-    std::thread([=] mutable {
+    std::jthread([=] mutable {
         cl::program prog = cl::build_program_with_cache(ctx, {func()}, false, options);
-
         prog.ensure_built();
 
         for(int i=0; i < (int)pending.size(); i++)
@@ -561,27 +560,7 @@ struct async_setter
     }
 };
 
-int max_build_threads()
-{
-    ///it seems like amd's drivers don't let you invoke multiple builds that really build in parallel
-    ///so this is more of a safety check in case A: nvidia/intel do, or B: amd up their game
-    return std::min(std::max(std::thread::hardware_concurrency(), 1u), 3u);
-}
-
-static std::counting_semaphore semaphore(max_build_threads());
-
-struct semaphore_manager
-{
-    semaphore_manager()
-    {
-        semaphore.acquire();
-    }
-
-    ~semaphore_manager()
-    {
-        semaphore.release();
-    }
-};
+static std::mutex build_mut;
 
 void cl::program::build(const context& ctx, const std::string& options)
 {
@@ -595,6 +574,7 @@ void cl::program::build(const context& ctx, const std::string& options)
 
     std::thread([prog, selected, build_options, async_ctx, options, cache_write, cache_name]()
     {
+
         async_setter sett(async_ctx);
 
         if(async_ctx->cancelled)
@@ -603,8 +583,8 @@ void cl::program::build(const context& ctx, const std::string& options)
         cl_int build_err = 0;
 
         {
-            ///serialise access to clbuildprogram
-            semaphore_manager lock;
+            ///serialise access to clbuildprogram so that you can perform cancellation
+            std::scoped_lock lock(build_mut);
 
             if(async_ctx->cancelled)
                 return;
