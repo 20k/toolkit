@@ -462,6 +462,7 @@ namespace cl
     template<typename T>
     struct read_info
     {
+        int64_t elements = 0;
         T* data = nullptr;
         event evt;
 
@@ -475,9 +476,33 @@ namespace cl
             data = nullptr;
         }
 
+        std::vector<T> as_vec()
+        {
+            assert(data);
+
+            evt.block();
+
+            return std::vector<T>(data, data + elements);
+        }
+
         ~read_info()
         {
             consume();
+        }
+    };
+
+    template<typename T>
+    struct read_info2
+    {
+        std::shared_ptr<std::vector<T>> data;
+        event evt;
+
+        std::vector<T> as_vec()
+        {
+            assert(data);
+            evt.block();
+
+            return std::move(*data);
         }
     };
 
@@ -530,6 +555,7 @@ namespace cl
         event read_async(command_queue& read_on, char* ptr, int64_t bytes, const std::vector<cl::event>& wait_on);
 
         template<typename T>
+        [[deprecated]]
         read_info<T> read_async(command_queue& read_on, int64_t elements, const std::vector<cl::event>& deps = std::vector<cl::event>())
         {
             read_info<T> ret;
@@ -541,6 +567,7 @@ namespace cl
 
             ret.data = new T[elements];
             ret.evt = read_async(read_on, (char*)ret.data, elements * sizeof(T), deps);
+            ret.elements = elements;
 
             return ret;
         }
@@ -569,6 +596,26 @@ namespace cl
             ret.resize(alloc_size / sizeof(T));
 
             read(read_on, (char*)&ret[0], alloc_size);
+
+            return ret;
+        }
+
+        template<typename T>
+        read_info2<T> read_async(command_queue& read_on)
+        {
+            read_info2<T> ret;
+
+            assert((alloc_size % sizeof(T)) == 0);
+
+            int64_t elements = alloc_size / sizeof(T);
+
+            if(elements == 0)
+                return ret;
+
+            ret.data = std::make_shared<std::vector<T>>();
+            ret.data->resize(elements);
+
+            ret.evt = read_async(read_on, (char*)ret.data->data(), elements * sizeof(T), {});
 
             return ret;
         }
