@@ -497,7 +497,7 @@ namespace cl
         std::shared_ptr<std::vector<T>> data;
         event evt;
 
-        std::vector<T> as_vec()
+        std::vector<T> to_vec()
         {
             assert(data);
             evt.block();
