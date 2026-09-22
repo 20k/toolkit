@@ -521,7 +521,10 @@ namespace cl
         template<typename T>
         cl::event write(command_queue& write_on, const std::vector<T>& data)
         {
-            return write(write_on, std::span{data});
+            if(data.size() == 0)
+                return cl::event();
+
+            return write(write_on, (const char*)data.data(), data.size() * sizeof(T));
         }
 
         template<typename T>
