@@ -18,6 +18,7 @@
 #include <functional>
 #include <span>
 #include <latch>
+#include <mutex>
 
 #ifndef __clang__
 #include <stdfloat>
